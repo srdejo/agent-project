@@ -27,6 +27,8 @@ export interface ProjectSummary {
   status: ProjectStatus;
   updated: string;
   series: number[];
+  tasksDone: number;
+  tasksTotal: number;
   events: AgentEvent[];
 }
 

@@ -11,7 +11,7 @@
       </span>
       <span class="hidden sm:inline uppercase">
         @if (lastSync(); as sync) {
-          LAST SYNC {{ sync | date: 'dd MMM y HH:mm':'UTC' }} UTC
+          LAST SYNC {{ sync | date: 'dd MMM y HH:mm':'-0500' }} COT
         } @else {
           NO SYNC YET
         }

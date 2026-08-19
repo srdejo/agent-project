@@ -3,14 +3,12 @@ import { Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ProjectApiService } from '../../core/services/project-api.service';
 import { AgentEvent, ProjectListResponse, ProjectSummary } from '../../core/models/project';
-import { eventColor, lastPoint, sparkPoints, statusColor } from '../../shared/format/progress-chart';
+import { eventColor, statusColor } from '../../shared/format/progress-chart';
 
 interface ProjectRow {
   project: ProjectSummary;
   dot: string;
-  spark: string;
-  sparkX: number;
-  sparkY: number;
+  tasksRatio: string;
 }
 
 interface GlobalEvent extends AgentEvent {
@@ -33,11 +31,11 @@ export class ProjectList {
   readonly stats = computed(() => this.response().stats);
 
   readonly rows = computed<ProjectRow[]>(() =>
-    this.response().projects.map((project) => {
-      const spark = sparkPoints(project.series.length ? project.series : [project.progress]);
-      const { x, y } = lastPoint(spark);
-      return { project, dot: statusColor(project.status), spark, sparkX: x, sparkY: y };
-    }),
+    this.response().projects.map((project) => ({
+      project,
+      dot: statusColor(project.status),
+      tasksRatio: `${project.tasksDone}/${project.tasksTotal}`,
+    })),
   );
 
   readonly activity = computed<GlobalEvent[]>(() => {

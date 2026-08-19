@@ -16,18 +16,6 @@ export function eventColor(mark: string): string {
   return '#A39C8E';
 }
 
-export function sparkPoints(series: number[], max = 100): string {
-  const n = series.length;
-  return series
-    .map((v, i) => `${((i * 120) / (n - 1)).toFixed(1)},${(30 - (v / max) * 28).toFixed(1)}`)
-    .join(' ');
-}
-
-export function lastPoint(points: string): { x: number; y: number } {
-  const [x, y] = points.split(' ').at(-1)!.split(',');
-  return { x: parseFloat(x), y: parseFloat(y) };
-}
-
 export function historyLine(series: number[], max = 100): string {
   const n = series.length;
   return series

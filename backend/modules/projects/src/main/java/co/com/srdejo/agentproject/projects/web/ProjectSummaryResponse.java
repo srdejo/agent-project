@@ -11,6 +11,8 @@ public record ProjectSummaryResponse(
         String status,
         String updated,
         List<Integer> series,
+        int tasksDone,
+        int tasksTotal,
         List<Event> events
 ) {
 

@@ -40,17 +40,17 @@
             </div>
             <div class="font-mono text-[11px] text-ink-muted mt-1.5 pl-[17px] truncate" [title]="row.project.stage">{{ row.project.stage }}</div>
           </div>
-          <div class="order-2 sm:order-none text-right text-[22px] font-semibold tracking-tight tabular-nums">{{ row.project.progress }}%</div>
           <div class="order-3 sm:order-none col-span-2 sm:col-span-1">
             <div class="h-1.5 bg-surface-divider overflow-hidden">
               <div class="h-1.5 bg-accent" [style.width.%]="row.project.progress"></div>
             </div>
             <div class="font-mono text-[10px] text-ink-muted mt-1.5">{{ row.project.status.replace('_', ' ') }}</div>
           </div>
-          <svg viewBox="0 0 120 30" preserveAspectRatio="none" class="hidden sm:block w-full h-[30px] overflow-visible">
-            <polyline [attr.points]="row.spark" fill="none" stroke="#B3AC9D" stroke-width="1.25" vector-effect="non-scaling-stroke" />
-            <circle [attr.cx]="row.sparkX" [attr.cy]="row.sparkY" r="2.4" fill="#14120E" />
-          </svg>
+          <div class="hidden sm:block">
+            <div class="text-[15px] font-medium tracking-tight tabular-nums">{{ row.tasksRatio }}</div>
+            <div class="font-mono text-[10px] text-ink-muted mt-1.5">TAREAS</div>
+          </div>
+          <div class="order-2 sm:order-none text-right text-[22px] font-semibold tracking-tight tabular-nums">{{ row.project.progress }}%</div>
         </div>
       }
     </div>

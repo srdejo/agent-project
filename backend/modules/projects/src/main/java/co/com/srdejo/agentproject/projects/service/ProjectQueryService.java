@@ -81,6 +81,9 @@ public class ProjectQueryService {
                 .map(ProjectSnapshotEntity::getProgress)
                 .toList();
 
+        int tasksDone = entity.getCompleted().size();
+        int tasksTotal = tasksDone + entity.getNextTasks().size() + entity.getBlocked().size();
+
         return new ProjectSummaryResponse(
                 entity.getId(),
                 entity.getName(),
@@ -90,6 +93,8 @@ public class ProjectQueryService {
                 entity.getStatus(),
                 entity.getUpdatedLabel(),
                 series,
+                tasksDone,
+                tasksTotal,
                 entity.getEvents().stream()
                         .map(e -> new ProjectSummaryResponse.Event(e.time(), e.mark(), e.text()))
                         .toList()
