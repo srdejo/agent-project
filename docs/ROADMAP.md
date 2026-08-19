@@ -53,6 +53,6 @@ Checkboxes `[x]` solo se marcan cuando la tarea fue **verificada en el código**
 - [x] Verificado localmente con el protocolo nuevo (2026-08-19): creación vía `nuevo.json`, rechazo de id desconocido en `progreso.json`, actualización con `last_modified` distinto, no-op con `last_modified` igual (probado enviando un `progress` distinto con el mismo timestamp — se ignoró correctamente), borrado de ambos archivos tras cada poll. Todo verificado por `curl` contra el backend local.
 - [x] `deploy.ps1` (build + scp + restart de `agent-project`/nginx en `nolost-vps`).
 - [x] `docs/DEPLOYMENT.md` (systemd, nginx, estructura de directorios esperada en el VPS).
-- [ ] Desplegar realmente en `nolost-vps` (requiere acceso SSH que esta sesión no tiene).
+- [x] Desplegado en `nolost-vps`: backend (`agent-project.service`, puerto 8083 loopback, Postgres `agent_project` propio) + frontend estático vía nginx. Dominio `https://agent.srdejo.com.co` con certificado Let's Encrypt (certbot). Verificado con `curl` contra `/` y `/api/projects` en HTTP y HTTPS — `200` en ambos, redirect `301` de HTTP a HTTPS.
 - [ ] `nolost` migrado a `ROADMAP.md`/`PROGRESS.md` con checkboxes (hecho — ver el repo `nolost`), pero falta que OpenClaw efectivamente genere y envíe su primer JSON de sync.
 - [ ] Configurar y programar OpenClaw (en la máquina del usuario) para generar y enviar el JSON de cada proyecto — fuera del alcance de este repo, ver nota en `docs/SYNC_PROTOCOL.md`.

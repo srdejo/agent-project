@@ -41,6 +41,9 @@ Consecuencias de diseño:
 - **Reversión deliberada del principio "nunca borrar en silencio"** (`InboxSyncJob` antes movía cada archivo procesado a `processed/`/`rejected/`, nunca lo borraba). Ahora `progreso.json`/`nuevo.json` se borran siempre tras cada poll, haya habido cambios o no — porque OpenClaw los regenera frescos en su próximo ciclo y el histórico real ya vive en `project_snapshots`, no hace falta conservar los archivos de entrada.
 - **El mecanismo de "¿cambió o no?" pasa de un hash de contenido calculado por el job (`last_sync_hash`, SHA-256) a la metadata `last_modified` que trae el propio payload** (columna `projects.source_last_modified`, migración `V2__project_last_modified.sql`) — se elimina la duplicidad de tener dos mecanismos de detección de cambio.
 
+### Deploy real a `nolost-vps`: puerto 8083, subdominio `agent.srdejo.com.co`
+Pedido explícito del usuario ("continua y si hay acceso al servidor"). `nolost` ya ocupa el puerto 8080 del mismo VPS, así que se relevaron los puertos en uso (`PORTS.md`, nuevo, en la raíz del workspace — se actualiza cada vez que se despliega un servicio) y se eligió 8083 (8081 está reservado para `hotel`, sin usar todavía). El usuario creó el registro DNS y corrió los pasos que requerían `sudo` (crear la base de datos, instalar el `systemd` unit, mover el config de nginx, `certbot`) — esta sesión no tiene sudo en el VPS, solo el usuario `srdejo` sin privilegios.
+
 ## Frontend
 
 ### Angular 22 standalone + Tailwind, sin librería de componentes

@@ -1,35 +1,40 @@
 # DEPLOYMENT.md
 
-Cómo desplegar `agent-project` en `nolost-vps`. Esta guía es documentación para aplicar manualmente (o en una sesión futura con acceso SSH al servidor) — no fue ejecutada en la sesión donde se escribió, que no tiene acceso al VPS.
+Cómo está desplegado `agent-project` en `nolost-vps`. **Desplegado y verificado el 2026-08-19** (`https://agent.srdejo.com.co`) — esto ya no es solo una guía, es la config real corriendo.
 
-## Prerrequisitos en el VPS
+## Prerrequisitos en el VPS (ya cumplidos)
 
-- PostgreSQL disponible (contenedor propio o instalación nativa — decidir si se reutiliza la instancia existente para `nolost` con una base de datos/usuario separado, o si se levanta una instancia nueva; no hay evidencia en este repo de cuál aplica en `nolost-vps` hoy).
-- Base de datos y usuario creados:
+- PostgreSQL: instancia existente del VPS (la misma que usa `nolost`), con base y usuario propios:
   ```sql
   CREATE DATABASE agent_project;
-  CREATE USER agent_project WITH PASSWORD '<password-real>';
+  CREATE USER agent_project WITH PASSWORD '<password-real, ver .env en el servidor>';
   GRANT ALL PRIVILEGES ON DATABASE agent_project TO agent_project;
+  ALTER DATABASE agent_project OWNER TO agent_project;
   ```
-- Java 21 instalado (para correr el jar).
-- nginx ya instalado y en uso (mismo que sirve `nolost`).
+- Java 21 instalado.
+- nginx ya instalado y en uso (mismo que sirve `nolost` y los demás sitios).
+- DNS: `agent.srdejo.com.co` → IP del VPS (`207.38.88.222`), registro A creado por el usuario.
+- Certificado SSL: `sudo certbot --nginx -d agent.srdejo.com.co`.
 
-## Estructura de directorios esperada
+## Puerto
+
+Backend en **`127.0.0.1:8083`** (loopback, nginx hace proxy) — `nolost` ya ocupa 8080 en el mismo servidor. Ver `PORTS.md` en la raíz del workspace para el mapa completo de puertos del VPS; actualizarlo cada vez que se despliega un servicio nuevo.
+
+## Estructura de directorios
 
 ```
 /home/srdejo/agent-project/
-├── app.jar              -> symlink al jar desplegado (ver deploy.ps1)
-├── agent-project-backend-0.0.1-SNAPSHOT.jar
+├── app.jar              -> symlink a bootstrap-0.0.1-SNAPSHOT.jar
+├── bootstrap-0.0.1-SNAPSHOT.jar
+├── .env                  (chmod 600 — credenciales de DB)
 └── data/
-    └── inbox/
-        ├── processed/    (creados automáticamente por el backend)
-        └── rejected/
+    └── inbox/            (progreso.json / nuevo.json, ver docs/SYNC_PROTOCOL.md)
 
 /home/srdejo/agent-project-frontend/
-└── ...                   (build estático de Angular)
+└── ...                   build estático de Angular (contenido de dist/frontend/browser/, sin la carpeta "browser" anidada)
 ```
 
-`data/` **nunca se borra** en un redeploy — es donde vive el estado local del inbox (el store real de proyectos está en Postgres, no en archivos).
+`data/` **nunca se borra** en un redeploy — el store real de proyectos está en Postgres, no en archivos.
 
 ## Servicio systemd (`agent-project.service`)
 
@@ -42,46 +47,53 @@ After=network.target postgresql.service
 Type=simple
 User=srdejo
 WorkingDirectory=/home/srdejo/agent-project
-ExecStart=/usr/bin/env java -jar /home/srdejo/agent-project/app.jar
+EnvironmentFile=/home/srdejo/agent-project/.env
+ExecStart=/usr/bin/env java -jar /home/srdejo/agent-project/app.jar --server.port=8083
 Restart=on-failure
-Environment=SPRING_PROFILES_ACTIVE=prod
-Environment=DB_HOST=localhost
-Environment=DB_PORT=5432
-Environment=DB_NAME=agent_project
-Environment=DB_USER=agent_project
-Environment=DB_PASSWORD=<password-real>
-Environment=SYNC_INBOX_DIR=/home/srdejo/agent-project/data/inbox
-Environment=SYNC_POLL_INTERVAL_MS=21600000
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Instalación (una sola vez):
+`.env` (chmod 600, no versionado):
+```
+SPRING_PROFILES_ACTIVE=prod
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=agent_project
+DB_USER=agent_project
+DB_PASSWORD=<password-real>
+SYNC_INBOX_DIR=/home/srdejo/agent-project/data/inbox
+SYNC_POLL_INTERVAL_MS=21600000
+```
+
+Instalación (ya hecha, dejar documentado para el próximo redeploy de cero):
 
 ```bash
 sudo mv agent-project.service /etc/systemd/system/agent-project.service
+sudo chmod 600 /home/srdejo/agent-project/.env
 sudo systemctl daemon-reload
-sudo systemctl enable agent-project
+sudo systemctl enable --now agent-project
 ```
 
 Flyway corre las migraciones automáticamente al arrancar el jar — no requiere paso manual en cada deploy.
 
-## nginx
-
-Sirve el frontend estático y hace proxy de `/api` al backend (puerto 8080, solo loopback):
+## nginx (`/etc/nginx/sites-enabled/agent`)
 
 ```nginx
 server {
     listen 80;
-    server_name agent-project.<tu-dominio>;  # o el host que corresponda
+    server_name agent.srdejo.com.co;
 
     root /home/srdejo/agent-project-frontend;
     index index.html;
 
     location /api/ {
-        proxy_pass http://127.0.0.1:8080/api/;
+        proxy_pass http://127.0.0.1:8083/api/;
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     location / {
@@ -90,9 +102,11 @@ server {
 }
 ```
 
-## Deploy
+(Certbot agregó automáticamente el bloque `listen 443 ssl` + redirect 80→443 al correr `certbot --nginx`.)
 
-Usar `deploy.ps1` en la raíz del repo (opción `5) Deploy Todo`, o backend/frontend por separado). Ver `docs/SYNC_PROTOCOL.md` para cómo OpenClaw entrega los archivos JSON al inbox una vez el backend está corriendo.
+## Redeploy
+
+Usar `deploy.ps1` en la raíz del repo (opción `5) Deploy Todo`, o backend/frontend por separado) — sube el jar/build nuevo y reinicia el servicio/nginx. Si el build de Angular usa SSR/prerender, el contenido queda en `dist/frontend/browser/` — copiar ese subdirectorio aplanado, no `dist/frontend/` completo. Ver `docs/SYNC_PROTOCOL.md` para cómo OpenClaw entrega los archivos JSON al inbox una vez el backend está corriendo.
 
 ## Backups
 

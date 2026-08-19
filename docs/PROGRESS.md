@@ -4,11 +4,11 @@ Estado del proyecto a **2026-08-19**. Actualizar este archivo cada vez que se ci
 
 ## Estado actual
 
-Etapa 5 — Sync recurrente + deploy a `nolost-vps` (🟡 el protocolo de sync está rediseñado, implementado y **verificado end-to-end en local** contra Postgres/nginx reales; falta el deploy al servidor y que OpenClaw genere/envíe los archivos de verdad).
+Etapa 5 — Sync recurrente + deploy a `nolost-vps` (🟡 protocolo de sync rediseñado y verificado en local; **ya desplegado y en vivo** en `https://agent.srdejo.com.co`; solo falta que OpenClaw genere/envíe los archivos de verdad).
 
 ## Tarea actual
 
-Ninguna en ejecución. Se cerró el rediseño del protocolo de sync (`progreso.json`/`nuevo.json`) y su verificación local completa.
+Ninguna en ejecución. Se cerró el rediseño del protocolo de sync y el deploy real a `nolost-vps`.
 
 ## Completado
 
@@ -25,6 +25,15 @@ Ninguna en ejecución. Se cerró el rediseño del protocolo de sync (`progreso.j
 - **Skill global `senior-backend-dev`**: actualizado a Spring Data JPA como default (sesión anterior, sin cambios hoy).
 - **`nolost`** (repo hermano): `ROADMAP.md`/`PROGRESS.md` en formato estándar (sesión anterior, sin cambios hoy).
 
+## Desplegado (2026-08-19)
+
+`agent-project` está en vivo en `nolost-vps`:
+- Backend: `agent-project.service` (systemd), puerto `8083` loopback (ver `PORTS.md` en la raíz del workspace — próximo puerto libre: `8084`), `EnvironmentFile=/home/srdejo/agent-project/.env`, Postgres propio (`agent_project`, usuario y base creados en esta sesión).
+- Frontend: build de producción en `/home/srdejo/agent-project-frontend`, servido por nginx.
+- Dominio: `https://agent.srdejo.com.co` (DNS A creado por el usuario, certificado Let's Encrypt vía `certbot --nginx`, redirect HTTP→HTTPS `301`).
+- Flyway aplicó `V1`+`V2` limpio contra la base nueva del servidor.
+- **Verificado**: `curl` contra `/` y `/api/projects` en HTTP y HTTPS, `200` en ambos.
+
 ## En progreso
 
 Nada.
@@ -33,14 +42,13 @@ Nada.
 
 En orden recomendado:
 
-1. **Pruebas unitarias** de `SyncPayloadParser.parseBatch` (batch mixto válido/inválido) y `ProjectSyncService` (creación, actualización, no-op por `last_modified`) — marcadas sin verificar en `ROADMAP.md` Etapas 1 y 2, es lo único que queda de deuda técnica real en el código nuevo.
-2. **Verificación visual en navegador** del dashboard contra el mockup "OpenClaw Control Center" (Etapa 4) — hasta ahora solo verificado por `curl`/build.
-3. **Desplegar `agent-project` en `nolost-vps`** siguiendo `docs/DEPLOYMENT.md` (requiere acceso SSH al servidor, fuera del alcance de esta sesión).
-4. **Configurar OpenClaw** (máquina del usuario) para que barra `docs/` de cada proyecto registrado y genere/envíe `progreso.json`/`nuevo.json` según el contrato de `docs/SYNC_PROTOCOL.md` — es lo único que falta para que el dashboard reciba datos reales en vez de los de prueba usados hoy.
+1. **Configurar OpenClaw** (máquina del usuario) para que barra `docs/` de cada proyecto registrado y genere/envíe `progreso.json`/`nuevo.json` a `agent.srdejo.com.co` (o directo al inbox del servidor) según el contrato de `docs/SYNC_PROTOCOL.md` — es lo único que falta para que el dashboard en producción reciba datos reales.
+2. **Pruebas unitarias** de `SyncPayloadParser.parseBatch` (batch mixto válido/inválido) y `ProjectSyncService` (creación, actualización, no-op por `last_modified`) — marcadas sin verificar en `ROADMAP.md` Etapas 1 y 2.
+3. **Verificación visual en navegador** del dashboard contra el mockup "OpenClaw Control Center" (Etapa 4) — hasta ahora solo verificado por `curl`/build, ahora se puede hacer directo contra `https://agent.srdejo.com.co`.
 
 ## Bloqueadores
 
-Ninguno técnico. El deploy real depende de acceso al servidor `nolost-vps`, fuera del alcance de esta sesión.
+Ninguno.
 
 ## Última actualización
 
