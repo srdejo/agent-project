@@ -19,13 +19,16 @@ public record SyncPayload(
         String updated,
         String commit,
         String verify,
-        List<String> completed,
-        List<String> next,
-        List<String> blocked,
+        String summary,
+        List<String> stack,
+        List<Task> tasks,
         List<TaskCheck> checks,
         List<AgentEvent> events,
         Instant lastModified
 ) {
+
+    public record Task(String name, String stage, String status, String date, String commit) {
+    }
 
     public record TaskCheck(String name, boolean ok, String duration) {
     }

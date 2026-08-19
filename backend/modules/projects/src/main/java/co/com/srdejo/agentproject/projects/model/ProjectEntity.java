@@ -40,17 +40,16 @@ public class ProjectEntity {
     @Column(name = "verify_status")
     private String verifyStatus;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(nullable = false, columnDefinition = "jsonb")
-    private List<String> completed = List.of();
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "next_tasks", nullable = false, columnDefinition = "jsonb")
-    private List<String> nextTasks = List.of();
+    @Column(columnDefinition = "text")
+    private String summary;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
-    private List<String> blocked = List.of();
+    private List<String> stack = List.of();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false, columnDefinition = "jsonb")
+    private List<TaskItem> tasks = List.of();
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
@@ -83,7 +82,7 @@ public class ProjectEntity {
 
     public void applySync(String name, String repo, String stage, String status, int progress,
                            String updatedLabel, String commitSha, String verifyStatus,
-                           List<String> completed, List<String> nextTasks, List<String> blocked,
+                           String summary, List<String> stack, List<TaskItem> tasks,
                            List<TaskCheck> checks, List<AgentEvent> events, Instant sourceLastModified, Instant now) {
         this.name = name;
         this.repo = repo;
@@ -93,9 +92,9 @@ public class ProjectEntity {
         this.updatedLabel = updatedLabel;
         this.commitSha = commitSha;
         this.verifyStatus = verifyStatus;
-        this.completed = completed;
-        this.nextTasks = nextTasks;
-        this.blocked = blocked;
+        this.summary = summary;
+        this.stack = stack;
+        this.tasks = tasks;
         this.checks = checks;
         this.events = events;
         this.sourceLastModified = sourceLastModified;
@@ -142,16 +141,16 @@ public class ProjectEntity {
         return verifyStatus;
     }
 
-    public List<String> getCompleted() {
-        return completed;
+    public String getSummary() {
+        return summary;
     }
 
-    public List<String> getNextTasks() {
-        return nextTasks;
+    public List<String> getStack() {
+        return stack;
     }
 
-    public List<String> getBlocked() {
-        return blocked;
+    public List<TaskItem> getTasks() {
+        return tasks;
     }
 
     public List<TaskCheck> getChecks() {
@@ -164,6 +163,9 @@ public class ProjectEntity {
 
     public Instant getSourceLastModified() {
         return sourceLastModified;
+    }
+
+    public record TaskItem(String name, String stage, String status, String date, String commit) {
     }
 
     public record TaskCheck(String name, boolean ok, String duration) {

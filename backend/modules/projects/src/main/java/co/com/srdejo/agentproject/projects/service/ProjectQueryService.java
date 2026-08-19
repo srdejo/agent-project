@@ -38,8 +38,8 @@ public class ProjectQueryService {
 
         int count = all.size();
         int avg = count == 0 ? 0 : (int) Math.round(all.stream().mapToInt(ProjectEntity::getProgress).average().orElse(0));
-        int blocked = all.stream().mapToInt(p -> p.getBlocked().size()).sum();
-        int verified = all.stream().mapToInt(p -> p.getCompleted().size()).sum();
+        int blocked = all.stream().mapToInt(p -> countByStatus(p, "blocked")).sum();
+        int verified = all.stream().mapToInt(p -> countByStatus(p, "done")).sum();
 
         String lastSync = syncRuns.findTopByOrderByRanAtDesc().map(run -> run.getRanAt().toString()).orElse(null);
 
@@ -60,9 +60,11 @@ public class ProjectQueryService {
                 entity.getUpdatedLabel(),
                 entity.getCommitSha(),
                 entity.getVerifyStatus(),
-                entity.getCompleted(),
-                entity.getNextTasks(),
-                entity.getBlocked(),
+                entity.getSummary(),
+                entity.getStack(),
+                entity.getTasks().stream()
+                        .map(t -> new ProjectDetailResponse.Task(t.name(), t.stage(), t.status(), t.date(), t.commit()))
+                        .toList(),
                 entity.getChecks().stream()
                         .map(c -> new ProjectDetailResponse.Check(c.name(), c.ok(), c.duration()))
                         .toList(),
@@ -81,8 +83,8 @@ public class ProjectQueryService {
                 .map(ProjectSnapshotEntity::getProgress)
                 .toList();
 
-        int tasksDone = entity.getCompleted().size();
-        int tasksTotal = tasksDone + entity.getNextTasks().size() + entity.getBlocked().size();
+        int tasksDone = countByStatus(entity, "done");
+        int tasksTotal = entity.getTasks().size();
 
         return new ProjectSummaryResponse(
                 entity.getId(),
@@ -99,5 +101,9 @@ public class ProjectQueryService {
                         .map(e -> new ProjectSummaryResponse.Event(e.time(), e.mark(), e.text()))
                         .toList()
         );
+    }
+
+    private int countByStatus(ProjectEntity entity, String status) {
+        return (int) entity.getTasks().stream().filter(t -> status.equals(t.status())).count();
     }
 }

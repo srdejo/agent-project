@@ -31,6 +31,22 @@
       <div class="h-2.5 bg-accent" [style.width.%]="p.progress"></div>
     </div>
 
+    <section class="mb-10">
+      <h2 class="text-[13px] font-semibold mb-3.5">Qué es este proyecto</h2>
+      @if (p.summary) {
+        <p class="max-w-[620px] text-[16px] leading-relaxed text-pretty">{{ p.summary }}</p>
+      } @else {
+        <p class="max-w-[620px] text-[13px] leading-relaxed text-ink-subtle">Sin descripción todavía.</p>
+      }
+      @if (p.stack.length) {
+        <div class="flex flex-wrap gap-2 mt-5">
+          @for (s of p.stack; track s) {
+            <span class="font-mono text-[10px] tracking-wide text-ink-muted border border-surface-border px-2.5 py-1.5">{{ s }}</span>
+          }
+        </div>
+      }
+    </section>
+
     <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-10 items-start">
       <section>
         <div class="flex items-baseline justify-between mb-3.5">
@@ -53,25 +69,22 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-px bg-surface-border border border-surface-border mt-7.5">
-          <div class="bg-surface-card p-4.5">
-            <div class="font-mono text-[10px] tracking-wider text-ink-muted mb-3">COMPLETED</div>
-            @for (t of p.completed; track t) {
-              <div class="flex gap-2 text-[13px] py-1"><span class="text-status-ok">✓</span><span>{{ t }}</span></div>
-            }
-          </div>
-          <div class="bg-surface-card p-4.5">
-            <div class="font-mono text-[10px] tracking-wider text-ink-muted mb-3">NEXT</div>
-            @for (t of p.next; track t) {
-              <div class="flex gap-2 text-[13px] py-1"><span class="text-ink-subtle">→</span><span>{{ t }}</span></div>
-            }
-          </div>
-          <div class="bg-surface-card p-4.5">
-            <div class="font-mono text-[10px] tracking-wider text-ink-muted mb-3">BLOCKED</div>
-            @for (t of (p.blocked.length ? p.blocked : ['None']); track t) {
-              <div class="flex gap-2 text-[13px] py-1"><span class="text-status-warn">⚠</span><span>{{ t }}</span></div>
-            }
-          </div>
+        <div class="flex items-baseline justify-between mt-7.5 mb-3.5">
+          <h2 class="text-[13px] font-semibold">Tareas desarrolladas</h2>
+          <span class="font-mono text-[10px] text-ink-subtle">{{ doneCount() }} / {{ tasks().length }} COMPLETADAS</span>
+        </div>
+        <div class="border-t border-surface-border">
+          @for (t of tasks(); track t.name) {
+            <div class="grid grid-cols-[14px_minmax(0,1fr)_70px_96px_66px] gap-3.5 items-baseline py-3 border-b border-surface-divider">
+              <span class="font-mono text-[11px]" [style.color]="t.color">{{ t.mark }}</span>
+              <span class="text-[14px] leading-snug" [style.color]="t.nameColor">{{ t.name }}</span>
+              <span class="font-mono text-[10px] text-ink-subtle">{{ t.stage }}</span>
+              <span class="font-mono text-[9px] tracking-wide" [style.color]="t.color">{{ t.label }}</span>
+              <span class="font-mono text-[10px] text-ink-subtle text-right">{{ t.date }}</span>
+            </div>
+          } @empty {
+            <p class="text-[13px] text-ink-subtle py-3">Sin tareas registradas todavía.</p>
+          }
         </div>
       </section>
 

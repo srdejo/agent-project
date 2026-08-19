@@ -1,10 +1,19 @@
 export type ProjectStatus = 'IN_PROGRESS' | 'BLOCKED' | 'STARTED' | 'COMPLETED';
 export type VerificationStatus = 'PASSED' | 'ATTENTION' | 'PENDING';
+export type TaskStatus = 'done' | 'wip' | 'blocked' | 'todo';
 
 export interface VerificationCheck {
   name: string;
   duration: string;
   ok: boolean;
+}
+
+export interface ProjectTask {
+  name: string;
+  stage: string;
+  status: TaskStatus;
+  date: string;
+  commit: string;
 }
 
 export interface AgentEvent {
@@ -55,9 +64,9 @@ export interface ProjectDetail {
   updated: string;
   commit: string;
   verify: VerificationStatus;
-  completed: string[];
-  next: string[];
-  blocked: string[];
+  summary: string | null;
+  stack: string[];
+  tasks: ProjectTask[];
   checks: VerificationCheck[];
   events: AgentEvent[];
   history: ProjectSnapshot[];

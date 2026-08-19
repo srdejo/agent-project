@@ -50,9 +50,9 @@ public class ProjectSyncService implements ProjectSyncPort {
                 request.updatedLabel(),
                 request.commitSha(),
                 request.verifyStatus(),
-                request.completed(),
-                request.nextTasks(),
-                request.blocked(),
+                request.summary(),
+                request.stack(),
+                toTasks(request.tasks()),
                 toChecks(request.checks()),
                 toEvents(request.events()),
                 request.lastModified(),
@@ -62,6 +62,12 @@ public class ProjectSyncService implements ProjectSyncPort {
         snapshots.save(ProjectSnapshotEntity.of(request.id(), request.progress(), request.stage(), request.status(), now));
 
         return isNew ? SyncOutcome.CREATED : SyncOutcome.UPDATED;
+    }
+
+    private List<ProjectEntity.TaskItem> toTasks(List<ProjectSyncRequest.Task> tasks) {
+        return tasks.stream()
+                .map(t -> new ProjectEntity.TaskItem(t.name(), t.stage(), t.status(), t.date(), t.commit()))
+                .toList();
     }
 
     private List<ProjectEntity.TaskCheck> toChecks(List<ProjectSyncRequest.Check> checks) {

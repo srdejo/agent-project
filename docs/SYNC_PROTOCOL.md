@@ -73,9 +73,12 @@ Mapa cuya clave es el **id del proyecto** (ya no va como campo `id` adentro del 
     "updated": "19 Aug 12:00",
     "commit": "8413025",
     "verify": "PASSED",
-    "completed": ["Consolidación"],
-    "next": ["Toma de asistencia móvil"],
-    "blocked": [],
+    "summary": "Plataforma de gestión para la iglesia: consolidación de miembros, mentoreo y asistencia.",
+    "stack": ["Node", "React", "PostgreSQL"],
+    "tasks": [
+      { "name": "Consolidación de miembros", "stage": "Fase 3", "status": "done", "date": "18 Ago", "commit": "8413025" },
+      { "name": "Toma de asistencia móvil", "stage": "Fase 3", "status": "wip", "date": "19 Ago", "commit": "—" }
+    ],
     "checks": [{ "name": "./gradlew test", "ok": true, "duration": "12s" }],
     "events": [{ "time": "12:00", "mark": "✓", "text": "Progress synchronization" }]
   },
@@ -102,9 +105,9 @@ Mapa cuya clave es el **id del proyecto** (ya no va como campo `id` adentro del 
 | `updated` | string | no | Etiqueta de última actualización (texto libre). |
 | `commit` | string | no | SHA corto del commit que originó este estado. |
 | `verify` | enum | sí | `PASSED \| ATTENTION \| PENDING`. |
-| `completed` | string[] | no | Tareas completadas y verificadas. |
-| `next` | string[] | no | Próximas tareas. |
-| `blocked` | string[] | no | Bloqueadores activos. |
+| `summary` | string | no | Descripción del proyecto en 1–2 frases, para la sección "Qué es este proyecto" del detalle. |
+| `stack` | string[] | no | Tecnologías/stack del proyecto (tags en el detalle). |
+| `tasks` | `{name, stage, status, date, commit}[]` | no | Tareas individuales del roadmap. `status` uno de `done \| wip \| blocked \| todo` — **`done` solo si hay evidencia de verificación real, nunca porque se escribió código** (misma regla que `progress`, ver más abajo). Alimenta la tabla "Tareas desarrolladas" del detalle y los conteos de tareas/bloqueados/verificadas del listado. |
 | `checks` | `{name, ok, duration}[]` | no | Última corrida de verificación. |
 | `events` | `{time, mark, text}[]` | no | Feed de actividad reciente del agente. |
 
@@ -115,13 +118,13 @@ Mapa cuya clave es el **id del proyecto** (ya no va como campo `id` adentro del 
 - **`progreso.json`**: cada clave debe ser un id **ya existente**. Si no existe, esa entrada se descarta (log de warning) — no crea proyectos. Si existe: se compara `last_modified` recibido contra el guardado; igual → no se toca la base; distinto → se aplica el update y se guarda una nueva fila en `project_snapshots`.
 - **`nuevo.json`**: cada clave debe ser un id que **no existe todavía**. Si ya existe, esa entrada se descarta (log de warning) — no pisa proyectos existentes vía este archivo. Si no existe, se crea.
 
-Una entrada con campos inválidos (falta un requerido, `status`/`verify` fuera del enum, `progress` fuera de 0–100, `last_modified` no parseable) también se descarta con warning — no bloquea al resto de las entradas del archivo.
+Una entrada con campos inválidos (falta un requerido, `status`/`verify` fuera del enum, `progress` fuera de 0–100, `last_modified` no parseable, o algún `tasks[].status` fuera de `done|wip|blocked|todo`) también se descarta con warning — no bloquea al resto de las entradas del archivo.
 
 ## Regla de negocio: nunca inventar progreso
 
-> No se actualiza el porcentaje porque el agente escribió código. Se actualiza cuando existe evidencia de avance (tarea del roadmap completa + verificación real).
+> No se actualiza el porcentaje porque el agente escribió código. Se actualiza cuando existe evidencia de avance (tarea del roadmap completa + verificación real). La misma regla aplica a `tasks[].status = "done"`: una tarea se marca `done` solo con evidencia real, nunca porque el código fue escrito.
 
-El backend no valida esto — es responsabilidad de quien genera el JSON (OpenClaw) no reportar `progress` sin evidencia real.
+El backend no valida esto — es responsabilidad de quien genera el JSON (OpenClaw) no reportar `progress` ni `tasks[].status: "done"` sin evidencia real.
 
 ## Fuera de alcance de este documento
 

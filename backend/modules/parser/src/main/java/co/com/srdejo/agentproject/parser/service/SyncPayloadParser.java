@@ -28,6 +28,7 @@ public class SyncPayloadParser {
 
     private static final Set<String> VALID_STATUSES = Set.of("IN_PROGRESS", "BLOCKED", "STARTED", "COMPLETED");
     private static final Set<String> VALID_VERIFY = Set.of("PASSED", "ATTENTION", "PENDING");
+    private static final Set<String> VALID_TASK_STATUSES = Set.of("done", "wip", "blocked", "todo");
 
     private final ObjectMapper objectMapper;
 
@@ -84,9 +85,9 @@ public class SyncPayloadParser {
                 optionalText(node, "updated"),
                 optionalText(node, "commit"),
                 verify,
-                textList(node, "completed"),
-                textList(node, "next"),
-                textList(node, "blocked"),
+                optionalText(node, "summary"),
+                textList(node, "stack"),
+                taskList(node),
                 checkList(node),
                 eventList(node),
                 lastModified
@@ -136,6 +137,27 @@ public class SyncPayloadParser {
         List<String> result = new ArrayList<>();
         if (value != null && value.isArray()) {
             value.forEach(item -> result.add(item.asText()));
+        }
+        return result;
+    }
+
+    private List<SyncPayload.Task> taskList(JsonNode node) {
+        JsonNode value = node.get("tasks");
+        List<SyncPayload.Task> result = new ArrayList<>();
+        if (value != null && value.isArray()) {
+            for (JsonNode item : value) {
+                String taskStatus = item.path("status").asText("");
+                if (!VALID_TASK_STATUSES.contains(taskStatus)) {
+                    throw new SyncValidationException("Task status must be one of " + VALID_TASK_STATUSES + ", got " + taskStatus);
+                }
+                result.add(new SyncPayload.Task(
+                        item.path("name").asText(""),
+                        item.path("stage").asText(""),
+                        taskStatus,
+                        item.path("date").asText(""),
+                        item.path("commit").asText("")
+                ));
+            }
         }
         return result;
     }

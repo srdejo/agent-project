@@ -3,7 +3,15 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map, switchMap } from 'rxjs';
 import { ProjectApiService } from '../../core/services/project-api.service';
-import { eventColor, historyLine, statusColor, verifyColor } from '../../shared/format/progress-chart';
+import {
+  eventColor,
+  historyLine,
+  statusColor,
+  taskColor,
+  taskLabel,
+  taskMark,
+  verifyColor,
+} from '../../shared/format/progress-chart';
 
 @Component({
   selector: 'app-project-detail',
@@ -33,6 +41,16 @@ export class ProjectDetail {
   readonly events = computed(() =>
     this.project()!.events.map((e) => ({ ...e, color: eventColor(e.mark) })),
   );
+  readonly tasks = computed(() =>
+    this.project()!.tasks.map((t) => ({
+      ...t,
+      mark: taskMark(t.status),
+      label: taskLabel(t.status),
+      color: taskColor(t.status),
+      nameColor: t.status === 'todo' ? '#7A756A' : '#14120E',
+    })),
+  );
+  readonly doneCount = computed(() => this.tasks().filter((t) => t.status === 'done').length);
   readonly series = computed(() => {
     const history = this.project()!.history;
     return history.length ? history.map((h) => h.progress) : [this.project()!.progress];

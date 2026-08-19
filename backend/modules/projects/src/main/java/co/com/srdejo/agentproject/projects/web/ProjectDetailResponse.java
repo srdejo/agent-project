@@ -12,13 +12,16 @@ public record ProjectDetailResponse(
         String updated,
         String commit,
         String verify,
-        List<String> completed,
-        List<String> next,
-        List<String> blocked,
+        String summary,
+        List<String> stack,
+        List<Task> tasks,
         List<Check> checks,
         List<Event> events,
         List<Snapshot> history
 ) {
+
+    public record Task(String name, String stage, String status, String date, String commit) {
+    }
 
     public record Check(String name, boolean ok, String duration) {
     }

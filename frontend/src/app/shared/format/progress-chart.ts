@@ -16,6 +16,24 @@ export function eventColor(mark: string): string {
   return '#A39C8E';
 }
 
+const TASK_MARKS: Record<string, string> = { done: '✓', wip: '→', blocked: '⚠', todo: '·' };
+const TASK_LABELS: Record<string, string> = { done: 'COMPLETADA', wip: 'EN CURSO', blocked: 'BLOQUEADA', todo: 'PENDIENTE' };
+
+export function taskMark(status: string): string {
+  return TASK_MARKS[status] ?? '·';
+}
+
+export function taskLabel(status: string): string {
+  return TASK_LABELS[status] ?? status;
+}
+
+export function taskColor(status: string): string {
+  if (status === 'done') return '#2F7D5A';
+  if (status === 'blocked') return '#A8621A';
+  if (status === 'wip') return '#3B6EA8';
+  return '#A39C8E';
+}
+
 export function historyLine(series: number[], max = 100): string {
   const n = series.length;
   return series

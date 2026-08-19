@@ -17,13 +17,16 @@ public record ProjectSyncRequest(
         String updatedLabel,
         String commitSha,
         String verifyStatus,
-        List<String> completed,
-        List<String> nextTasks,
-        List<String> blocked,
+        String summary,
+        List<String> stack,
+        List<Task> tasks,
         List<Check> checks,
         List<Event> events,
         Instant lastModified
 ) {
+
+    public record Task(String name, String stage, String status, String date, String commit) {
+    }
 
     public record Check(String name, boolean ok, String duration) {
     }

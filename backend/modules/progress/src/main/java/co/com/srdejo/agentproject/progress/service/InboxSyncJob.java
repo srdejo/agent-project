@@ -130,9 +130,11 @@ public class InboxSyncJob {
                 payload.updated(),
                 payload.commit(),
                 payload.verify(),
-                payload.completed(),
-                payload.next(),
-                payload.blocked(),
+                payload.summary(),
+                payload.stack(),
+                payload.tasks().stream()
+                        .map(t -> new ProjectSyncRequest.Task(t.name(), t.stage(), t.status(), t.date(), t.commit()))
+                        .toList(),
                 payload.checks().stream()
                         .map(c -> new ProjectSyncRequest.Check(c.name(), c.ok(), c.duration()))
                         .toList(),
