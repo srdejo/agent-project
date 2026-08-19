@@ -1,0 +1,6 @@
+dependencies {
+    implementation project(':platform:web-common')
+    implementation rootProject.libs.spring.boot.starter.validation
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'org.springframework:spring-context'
+}

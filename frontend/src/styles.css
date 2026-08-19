@@ -1,0 +1,12 @@
+@import 'tailwindcss';
+@config '../tailwind.config.js';
+
+html,
+body {
+  @apply bg-surface-bg text-ink font-sans antialiased;
+}
+
+::selection {
+  background: #facc15;
+  color: #14120e;
+}

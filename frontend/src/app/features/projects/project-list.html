@@ -1,0 +1,79 @@
+<div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(230px,320px)] items-start">
+  <section class="px-6 md:px-10 pt-8 pb-16 border-r-0 md:border-r border-surface-border min-h-[80vh]">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-px bg-surface-border border border-surface-border mb-9">
+      <div class="bg-surface-card p-4">
+        <div class="font-mono text-[10px] tracking-wider text-ink-muted mb-2">PROJECTS</div>
+        <div class="text-3xl font-semibold tracking-tight leading-none">{{ stats().count }}</div>
+      </div>
+      <div class="bg-surface-card p-4">
+        <div class="font-mono text-[10px] tracking-wider text-ink-muted mb-2">AVG PROGRESS</div>
+        <div class="text-3xl font-semibold tracking-tight leading-none">{{ stats().avg }}%</div>
+      </div>
+      <div class="bg-surface-card p-4">
+        <div class="font-mono text-[10px] tracking-wider text-ink-muted mb-2">BLOCKED</div>
+        <div class="text-3xl font-semibold tracking-tight leading-none text-status-warn">{{ stats().blocked }}</div>
+      </div>
+      <div class="bg-surface-card p-4">
+        <div class="font-mono text-[10px] tracking-wider text-ink-muted mb-2">VERIFIED TASKS</div>
+        <div class="text-3xl font-semibold tracking-tight leading-none">{{ stats().verified }}</div>
+      </div>
+    </div>
+
+    <div class="flex items-baseline justify-between mb-3.5">
+      <h2 class="text-[13px] font-semibold tracking-wide">All projects</h2>
+      <span class="font-mono text-[10px] text-ink-subtle hidden sm:inline">SOURCE: ROADMAP.md · PROGRESS.md · GIT</span>
+    </div>
+
+    <div class="border-t border-surface-border">
+      @for (row of rows(); track row.project.id) {
+        <div
+          role="button"
+          tabindex="0"
+          (click)="open(row.project.id)"
+          (keydown.enter)="open(row.project.id)"
+          class="grid grid-cols-[minmax(140px,1fr)_minmax(90px,130px)_minmax(64px,110px)_60px] items-center gap-4 py-5 px-2 border-b border-surface-border cursor-pointer transition-colors hover:bg-surface-card"
+        >
+          <div class="min-w-0">
+            <div class="flex items-center gap-2.5">
+              <span class="w-[7px] h-[7px] flex-none rounded-full" [style.background]="row.dot"></span>
+              <span class="text-[17px] font-medium tracking-tight">{{ row.project.name }}</span>
+            </div>
+            <div class="font-mono text-[11px] text-ink-muted mt-1.5 pl-[17px]">{{ row.project.stage }}</div>
+          </div>
+          <div>
+            <div class="h-1.5 bg-surface-divider overflow-hidden">
+              <div class="h-1.5 bg-accent" [style.width.%]="row.project.progress"></div>
+            </div>
+            <div class="font-mono text-[10px] text-ink-muted mt-1.5">{{ row.project.status.replace('_', ' ') }}</div>
+          </div>
+          <svg viewBox="0 0 120 30" preserveAspectRatio="none" class="w-full h-[30px] overflow-visible">
+            <polyline [attr.points]="row.spark" fill="none" stroke="#B3AC9D" stroke-width="1.25" vector-effect="non-scaling-stroke" />
+            <circle [attr.cx]="row.sparkX" [attr.cy]="row.sparkY" r="2.4" fill="#14120E" />
+          </svg>
+          <div class="text-right text-[22px] font-semibold tracking-tight tabular-nums">{{ row.project.progress }}%</div>
+        </div>
+      }
+    </div>
+
+    <p class="max-w-xl mt-8 text-[13px] leading-relaxed text-ink-muted">
+      Progress moves only when a roadmap task is complete <em>and</em> verification evidence exists. Code changes
+      alone do not advance a percentage.
+    </p>
+  </section>
+
+  <aside class="px-6 md:px-8 pt-8 pb-16">
+    <h2 class="text-[13px] font-semibold tracking-wide mb-4">Agent activity</h2>
+    <div class="flex flex-col">
+      @for (event of activity(); track event.time + event.text) {
+        <div class="grid grid-cols-[46px_14px_minmax(0,1fr)] gap-2.5 items-start py-2.5 border-b border-surface-divider">
+          <span class="font-mono text-[11px] text-ink-subtle">{{ event.time }}</span>
+          <span class="font-mono text-[11px]" [style.color]="event.color">{{ event.mark }}</span>
+          <span>
+            <span class="text-[13px] leading-snug block">{{ event.text }}</span>
+            <span class="font-mono text-[10px] text-ink-subtle block mt-0.5">{{ event.repo }}</span>
+          </span>
+        </div>
+      }
+    </div>
+  </aside>
+</div>
