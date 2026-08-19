@@ -18,7 +18,7 @@ interface GlobalEvent extends AgentEvent {
   color: string;
 }
 
-const EMPTY_RESPONSE: ProjectListResponse = { projects: [], stats: { count: 0, avg: 0, blocked: 0, verified: 0 } };
+const EMPTY_RESPONSE: ProjectListResponse = { projects: [], stats: { count: 0, avg: 0, blocked: 0, verified: 0 }, lastSync: null };
 
 @Component({
   selector: 'app-project-list',

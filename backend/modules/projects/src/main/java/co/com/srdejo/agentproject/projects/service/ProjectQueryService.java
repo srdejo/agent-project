@@ -4,6 +4,7 @@ import co.com.srdejo.agentproject.projects.model.ProjectEntity;
 import co.com.srdejo.agentproject.projects.model.ProjectSnapshotEntity;
 import co.com.srdejo.agentproject.projects.repository.ProjectJpaRepository;
 import co.com.srdejo.agentproject.projects.repository.ProjectSnapshotJpaRepository;
+import co.com.srdejo.agentproject.projects.repository.SyncRunJpaRepository;
 import co.com.srdejo.agentproject.projects.web.ProjectDetailResponse;
 import co.com.srdejo.agentproject.projects.web.ProjectListResponse;
 import co.com.srdejo.agentproject.projects.web.ProjectNotFoundException;
@@ -20,10 +21,12 @@ public class ProjectQueryService {
 
     private final ProjectJpaRepository projects;
     private final ProjectSnapshotJpaRepository snapshots;
+    private final SyncRunJpaRepository syncRuns;
 
-    public ProjectQueryService(ProjectJpaRepository projects, ProjectSnapshotJpaRepository snapshots) {
+    public ProjectQueryService(ProjectJpaRepository projects, ProjectSnapshotJpaRepository snapshots, SyncRunJpaRepository syncRuns) {
         this.projects = projects;
         this.snapshots = snapshots;
+        this.syncRuns = syncRuns;
     }
 
     public ProjectListResponse listAll() {
@@ -38,7 +41,9 @@ public class ProjectQueryService {
         int blocked = all.stream().mapToInt(p -> p.getBlocked().size()).sum();
         int verified = all.stream().mapToInt(p -> p.getCompleted().size()).sum();
 
-        return new ProjectListResponse(summaries, new ProjectListResponse.Stats(count, avg, blocked, verified));
+        String lastSync = syncRuns.findTopByOrderByRanAtDesc().map(run -> run.getRanAt().toString()).orElse(null);
+
+        return new ProjectListResponse(summaries, new ProjectListResponse.Stats(count, avg, blocked, verified), lastSync);
     }
 
     public ProjectDetailResponse getById(String id) {

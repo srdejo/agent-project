@@ -20,7 +20,7 @@ module.exports = {
           subtle: '#A39C8E',
           faint: '#CFC8B9',
         },
-        accent: '#FACC15',
+        accent: '#3B6EA8',
         status: {
           ok: '#2F7D5A',
           warn: '#A8621A',

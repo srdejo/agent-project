@@ -17,6 +17,16 @@ Si está `active`/`200`, alcanza con subir los archivos al inbox — no hace fal
 ssh srdejo@nolost-vps "sudo systemctl restart agent-project"
 ```
 
+## Consultar el API antes de clasificar progreso.json vs nuevo.json
+
+Antes de armar los dos archivos, consultar `GET /api/projects` (`https://agent.srdejo.com.co/api/projects`) para saber qué ids ya existen en la base:
+
+```bash
+curl -s https://agent.srdejo.com.co/api/projects
+```
+
+La respuesta trae `projects[].id` — esa es la lista real de proyectos ya creados. Cualquier proyecto de `docs/` (o `README.md`, si `docs/` no existe o está vacía) cuyo id **no** aparezca ahí va en `nuevo.json`; los que sí aparezcan van en `progreso.json`. No confiar en memoria de sesiones anteriores ni asumir la lista — el API es la fuente de verdad, puede haber cambiado (proyectos creados manualmente, borrados, etc.).
+
 ## Dos archivos fijos, no uno por proyecto
 
 En cada corrida, OpenClaw barre la carpeta `docs/` de todos los proyectos registrados y genera **como máximo dos archivos**, cada uno un mapa `id de proyecto -> datos`:

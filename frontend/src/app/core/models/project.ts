@@ -40,6 +40,7 @@ export interface ProjectStats {
 export interface ProjectListResponse {
   projects: ProjectSummary[];
   stats: ProjectStats;
+  lastSync: string | null;
 }
 
 export interface ProjectDetail {

@@ -24,6 +24,11 @@ Ninguna en ejecución. Se cerró el rediseño del protocolo de sync y el deploy 
 - **Documentación**: `docs/SYNC_PROTOCOL.md`, `docs/DEPLOYMENT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/ROADMAP.md` actualizados a reflejar el protocolo nuevo.
 - **Skill global `senior-backend-dev`**: actualizado a Spring Data JPA como default (sesión anterior, sin cambios hoy).
 - **`nolost`** (repo hermano): `ROADMAP.md`/`PROGRESS.md` en formato estándar (sesión anterior, sin cambios hoy).
+- **Frontend — mobile-first (Etapa 6, 2026-08-19)**: sin acceso a navegador/DevTools en esta sesión, se identificó por inspección directa del CSS/Tailwind qué se rompía en viewport de 375px y se corrigió:
+  - `project-list.html` — la fila de proyecto usaba `grid-cols-[minmax(140px,1fr)_minmax(90px,130px)_minmax(64px,110px)_60px]`, cuyo ancho mínimo (~410px + gaps) supera un viewport de 375px y forzaba overflow horizontal. Ahora es `grid-cols-2` en mobile (nombre a la izquierda, % a la derecha en la primera fila; barra de progreso a ancho completo en la segunda fila) y vuelve al grid original de 4 columnas desde `sm:`. El sparkline SVG se oculta en mobile (`hidden sm:block`) porque a ese ancho no aporta y competía por espacio.
+  - `project-detail.html` — título y porcentaje con tamaños responsivos (`text-2xl sm:text-4xl` / `text-3xl sm:text-5xl` en vez de fijos `text-4xl`/`text-5xl`), meta-línea (repo/etapa/estado) con `flex-wrap` y separadores `·` ocultos en mobile. El resto de las grillas (historial, completado/siguiente/bloqueado, evidencia, actividad) ya eran `grid-cols-1` por defecto y no necesitaron cambio.
+  - `app.html` (header global) — padding/gaps/tamaños de fuente reducidos en mobile, "Project Control Center" con `truncate` para que no empuje el bloque "PUBLIC TRACKING" fuera del viewport.
+  - **Verificado**: `npm run build` compila sin errores. Desplegado a `nolost-vps` (build de producción subido a `/home/srdejo/agent-project-frontend`, nginx reiniciado, `200` en `/` y `/api/projects`). El usuario confirmó visualmente contra `https://agent.srdejo.com.co` desde su iPhone (capturas del listado de proyectos): stats en grid 2x2, filas sin overflow horizontal, progreso/porcentaje legibles — "quedó súper bien". **Etapa 6 cerrada (🟢)** en `ROADMAP.md`; de paso también se cerró el pendiente de verificación visual de la Etapa 4.
 
 ## Desplegado (2026-08-19)
 
@@ -43,8 +48,7 @@ Nada.
 En orden recomendado:
 
 1. **Configurar OpenClaw** (máquina del usuario) para que barra `docs/` de cada proyecto registrado y genere/envíe `progreso.json`/`nuevo.json` a `agent.srdejo.com.co` (o directo al inbox del servidor) según el contrato de `docs/SYNC_PROTOCOL.md` — es lo único que falta para que el dashboard en producción reciba datos reales.
-2. **Pruebas unitarias** de `SyncPayloadParser.parseBatch` (batch mixto válido/inválido) y `ProjectSyncService` (creación, actualización, no-op por `last_modified`) — marcadas sin verificar en `ROADMAP.md` Etapas 1 y 2.
-3. **Verificación visual en navegador** del dashboard contra el mockup "OpenClaw Control Center" (Etapa 4) — hasta ahora solo verificado por `curl`/build, ahora se puede hacer directo contra `https://agent.srdejo.com.co`.
+2. **Pruebas unitarias** de `SyncPayloadParser.parseBatch` (batch mixto válido/inválido) y `ProjectSyncService` (creación, actualización, no-op por `last_modified`) — marcadas sin verificar en `ROADMAP.md` Etapas 1 y 2. Es lo único que queda pendiente en todo el roadmap.
 
 ## Bloqueadores
 

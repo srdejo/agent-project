@@ -31,26 +31,26 @@
           tabindex="0"
           (click)="open(row.project.id)"
           (keydown.enter)="open(row.project.id)"
-          class="grid grid-cols-[minmax(140px,1fr)_minmax(90px,130px)_minmax(64px,110px)_60px] items-center gap-4 py-5 px-2 border-b border-surface-border cursor-pointer transition-colors hover:bg-surface-card"
+          class="grid grid-cols-2 sm:grid-cols-[minmax(140px,1fr)_minmax(90px,130px)_minmax(64px,110px)_60px] items-center gap-x-4 gap-y-2.5 py-5 px-2 border-b border-surface-border cursor-pointer transition-colors hover:bg-surface-card"
         >
-          <div class="min-w-0">
+          <div class="min-w-0 order-1 sm:order-none">
             <div class="flex items-center gap-2.5">
               <span class="w-[7px] h-[7px] flex-none rounded-full" [style.background]="row.dot"></span>
               <span class="text-[17px] font-medium tracking-tight">{{ row.project.name }}</span>
             </div>
-            <div class="font-mono text-[11px] text-ink-muted mt-1.5 pl-[17px]">{{ row.project.stage }}</div>
+            <div class="font-mono text-[11px] text-ink-muted mt-1.5 pl-[17px] truncate" [title]="row.project.stage">{{ row.project.stage }}</div>
           </div>
-          <div>
+          <div class="order-2 sm:order-none text-right text-[22px] font-semibold tracking-tight tabular-nums">{{ row.project.progress }}%</div>
+          <div class="order-3 sm:order-none col-span-2 sm:col-span-1">
             <div class="h-1.5 bg-surface-divider overflow-hidden">
               <div class="h-1.5 bg-accent" [style.width.%]="row.project.progress"></div>
             </div>
             <div class="font-mono text-[10px] text-ink-muted mt-1.5">{{ row.project.status.replace('_', ' ') }}</div>
           </div>
-          <svg viewBox="0 0 120 30" preserveAspectRatio="none" class="w-full h-[30px] overflow-visible">
+          <svg viewBox="0 0 120 30" preserveAspectRatio="none" class="hidden sm:block w-full h-[30px] overflow-visible">
             <polyline [attr.points]="row.spark" fill="none" stroke="#B3AC9D" stroke-width="1.25" vector-effect="non-scaling-stroke" />
             <circle [attr.cx]="row.sparkX" [attr.cy]="row.sparkY" r="2.4" fill="#14120E" />
           </svg>
-          <div class="text-right text-[22px] font-semibold tracking-tight tabular-nums">{{ row.project.progress }}%</div>
         </div>
       }
     </div>

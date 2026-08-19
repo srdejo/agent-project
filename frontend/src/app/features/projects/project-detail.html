@@ -10,19 +10,19 @@
       <span>←</span><span>ALL PROJECTS</span>
     </div>
 
-    <div class="flex items-end justify-between gap-8 flex-wrap mb-6">
-      <div>
-        <h1 class="text-4xl font-semibold tracking-tight leading-tight">{{ p.name }}</h1>
-        <div class="flex items-center gap-3.5 mt-3 font-mono text-[11px] text-ink-muted">
+    <div class="flex items-end justify-between gap-4 sm:gap-8 flex-wrap mb-6">
+      <div class="min-w-0">
+        <h1 class="text-2xl sm:text-4xl font-semibold tracking-tight leading-tight break-words">{{ p.name }}</h1>
+        <div class="flex flex-wrap items-center gap-x-3.5 gap-y-1 mt-3 font-mono text-[11px] text-ink-muted">
           <span>{{ p.repo }}</span>
-          <span class="text-ink-faint">·</span>
+          <span class="text-ink-faint hidden sm:inline">·</span>
           <span>{{ p.stage }}</span>
-          <span class="text-ink-faint">·</span>
+          <span class="text-ink-faint hidden sm:inline">·</span>
           <span [style.color]="dot()">{{ p.status.replace('_', ' ') }}</span>
         </div>
       </div>
       <div class="text-right">
-        <div class="text-5xl font-semibold tracking-tight leading-none tabular-nums">{{ p.progress }}%</div>
+        <div class="text-3xl sm:text-5xl font-semibold tracking-tight leading-none tabular-nums">{{ p.progress }}%</div>
         <div class="font-mono text-[10px] text-ink-subtle mt-1.5">UPDATED {{ p.updated }}</div>
       </div>
     </div>
