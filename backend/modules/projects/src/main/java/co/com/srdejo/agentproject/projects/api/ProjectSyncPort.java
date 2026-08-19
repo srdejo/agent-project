@@ -6,5 +6,7 @@ package co.com.srdejo.agentproject.projects.api;
  */
 public interface ProjectSyncPort {
 
+    boolean exists(String id);
+
     SyncOutcome applySync(ProjectSyncRequest request);
 }

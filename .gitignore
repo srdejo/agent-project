@@ -4,7 +4,7 @@ backend/**/build/
 backend/bin/
 !backend/gradle/wrapper/gradle-wrapper.jar
 backend/out/
-backend/data/
+backend/**/data/
 
 # Frontend (Angular / Node)
 frontend/node_modules/

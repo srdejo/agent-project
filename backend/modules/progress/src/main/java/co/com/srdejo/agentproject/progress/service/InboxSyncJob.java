@@ -1,5 +1,6 @@
 package co.com.srdejo.agentproject.progress.service;
 
+import co.com.srdejo.agentproject.parser.api.BatchParseResult;
 import co.com.srdejo.agentproject.parser.api.SyncPayload;
 import co.com.srdejo.agentproject.parser.api.SyncValidationException;
 import co.com.srdejo.agentproject.parser.service.SyncPayloadParser;
@@ -15,23 +16,21 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.time.Instant;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.stream.Stream;
 
 /**
- * Polls the sync inbox for JSON files dropped by OpenClaw (see docs/SYNC_PROTOCOL.md) and applies
- * them onto {@code modules:projects} through {@link ProjectSyncPort}. Never invents progress: a file
- * that fails validation goes to {@code rejected/} untouched, the project state is not modified.
+ * Polls the sync inbox for two fixed files dropped by OpenClaw on each of its own runs (see
+ * docs/SYNC_PROTOCOL.md): {@code progreso.json} (updates for projects that already exist) and
+ * {@code nuevo.json} (brand new projects to create). Each entry is validated and applied
+ * independently — one bad entry never blocks the rest of the file. Both files are always deleted
+ * after being processed, since OpenClaw regenerates them fresh on its next run; the real history
+ * lives in {@code project_snapshots}, not on the filesystem.
  */
 @Component
 public class InboxSyncJob {
 
     private static final Logger log = LoggerFactory.getLogger(InboxSyncJob.class);
+    private static final String PROGRESO_FILE = "progreso.json";
+    private static final String NUEVO_FILE = "nuevo.json";
 
     private final SyncPayloadParser parser;
     private final ProjectSyncPort syncPort;
@@ -46,25 +45,16 @@ public class InboxSyncJob {
 
     @Scheduled(fixedDelayString = "${agent-project.sync.poll-interval-ms}")
     public void poll() {
-        List<Path> files = listInboxFiles();
-        for (Path file : files) {
-            processFile(file);
-        }
+        processIfPresent(PROGRESO_FILE, this::applyProgresoEntry);
+        processIfPresent(NUEVO_FILE, this::applyNuevoEntry);
     }
 
-    private List<Path> listInboxFiles() {
-        try {
-            Files.createDirectories(inboxDir);
-            try (Stream<Path> stream = Files.list(inboxDir)) {
-                return stream.filter(p -> p.toString().endsWith(".json")).toList();
-            }
-        } catch (IOException e) {
-            log.error("Failed to list sync inbox directory {}", inboxDir, e);
-            return List.of();
+    private void processIfPresent(String fileName, EntryHandler handler) {
+        Path file = inboxDir.resolve(fileName);
+        if (!Files.isRegularFile(file)) {
+            return;
         }
-    }
 
-    private void processFile(Path file) {
         String content;
         try {
             content = Files.readString(file, StandardCharsets.UTF_8);
@@ -73,18 +63,42 @@ public class InboxSyncJob {
             return;
         }
 
-        SyncPayload payload;
+        BatchParseResult result;
         try {
-            payload = parser.parse(content);
+            result = parser.parseBatch(content);
         } catch (SyncValidationException e) {
-            log.warn("Rejected sync file {}: {}", file.getFileName(), e.getMessage());
-            moveTo(file, "rejected");
+            log.warn("Rejected {}: {}", fileName, e.getMessage());
+            deleteQuietly(file);
             return;
         }
 
-        String hash = sha256(content.trim());
-        var request = new ProjectSyncRequest(
-                payload.id(),
+        result.rejected().forEach((id, reason) -> log.warn("Rejected entry '{}' in {}: {}", id, fileName, reason));
+        result.valid().forEach(handler::apply);
+
+        deleteQuietly(file);
+    }
+
+    private void applyProgresoEntry(String id, SyncPayload payload) {
+        if (!syncPort.exists(id)) {
+            log.warn("Skipping '{}' in {}: project does not exist yet, use {} to create it", id, PROGRESO_FILE, NUEVO_FILE);
+            return;
+        }
+        var outcome = syncPort.applySync(toRequest(id, payload));
+        log.info("Synced project '{}' from {}: {}", id, PROGRESO_FILE, outcome);
+    }
+
+    private void applyNuevoEntry(String id, SyncPayload payload) {
+        if (syncPort.exists(id)) {
+            log.warn("Skipping '{}' in {}: project already exists, use {} to update it", id, NUEVO_FILE, PROGRESO_FILE);
+            return;
+        }
+        var outcome = syncPort.applySync(toRequest(id, payload));
+        log.info("Created project '{}' from {}: {}", id, NUEVO_FILE, outcome);
+    }
+
+    private ProjectSyncRequest toRequest(String id, SyncPayload payload) {
+        return new ProjectSyncRequest(
+                id,
                 payload.name(),
                 payload.repo(),
                 payload.stage(),
@@ -102,37 +116,20 @@ public class InboxSyncJob {
                 payload.events().stream()
                         .map(e -> new ProjectSyncRequest.Event(e.time(), e.mark(), e.text()))
                         .toList(),
-                hash
+                payload.lastModified()
         );
-
-        var outcome = syncPort.applySync(request);
-        log.info("Synced project {} from {}: {}", payload.id(), file.getFileName(), outcome);
-        moveTo(file, "processed", payload.id());
     }
 
-    private void moveTo(Path file, String subdir) {
-        moveTo(file, subdir, null);
-    }
-
-    private void moveTo(Path file, String subdir, String projectId) {
+    private void deleteQuietly(Path file) {
         try {
-            Path targetDir = inboxDir.resolve(subdir);
-            Files.createDirectories(targetDir);
-            String prefix = projectId != null ? projectId + "-" : "";
-            Path target = targetDir.resolve(prefix + Instant.now().toEpochMilli() + "-" + file.getFileName());
-            Files.move(file, target, StandardCopyOption.REPLACE_EXISTING);
+            Files.deleteIfExists(file);
         } catch (IOException e) {
-            log.error("Failed to move processed inbox file {} to {}", file, subdir, e);
+            log.error("Failed to delete inbox file {}", file, e);
         }
     }
 
-    private String sha256(String content) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(content.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
-        }
+    @FunctionalInterface
+    private interface EntryHandler {
+        void apply(String id, SyncPayload payload);
     }
 }

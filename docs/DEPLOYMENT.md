@@ -51,7 +51,7 @@ Environment=DB_NAME=agent_project
 Environment=DB_USER=agent_project
 Environment=DB_PASSWORD=<password-real>
 Environment=SYNC_INBOX_DIR=/home/srdejo/agent-project/data/inbox
-Environment=SYNC_POLL_INTERVAL_MS=300000
+Environment=SYNC_POLL_INTERVAL_MS=21600000
 
 [Install]
 WantedBy=multi-user.target

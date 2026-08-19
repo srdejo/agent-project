@@ -18,10 +18,10 @@ agent-project/
 
 ## Cómo entran los datos: sync por archivo, no por API pública
 
-El backend **no** clona repos ni parsea Markdown. Un agente externo (OpenClaw, corriendo en la máquina del desarrollador) deposita un JSON por proyecto en un directorio "inbox" del servidor; un job programado dentro del backend lo lee, valida y aplica. Ver `docs/SYNC_PROTOCOL.md` para el contrato completo.
+El backend **no** clona repos ni parsea Markdown. Un agente externo (OpenClaw, corriendo en la máquina del desarrollador) deposita dos archivos fijos (`progreso.json`, `nuevo.json` — mapas `id -> datos`, no uno por proyecto) en un directorio "inbox" del servidor; un job programado dentro del backend los lee, valida y aplica entrada por entrada, y los borra al terminar. Ver `docs/SYNC_PROTOCOL.md` para el contrato completo.
 
 ```
-OpenClaw (máquina del dev) --scp--> data/inbox/<id>.json --poll (InboxSyncJob)--> Postgres (projects, project_snapshots)
+OpenClaw (máquina del dev) --scp--> data/inbox/{progreso,nuevo}.json --poll (InboxSyncJob)--> Postgres (projects, project_snapshots)
                                                                                         │
                                                                                         ▼
                                                               GET /api/projects, GET /api/projects/{id}
@@ -53,7 +53,7 @@ Reglas de dependencia entre módulos:
 - `modules/progress` depende de `modules/projects` (para aplicar el sync) y `modules/parser` (para validar el JSON) — es la única dependencia cruzada entre módulos de negocio hoy.
 - `bootstrap` depende de todos, habilita `@EnableJpaRepositories`/`@EntityScan`/`@EnableScheduling` con `basePackages = "co.com.srdejo.agentproject"` (necesario porque los módulos no son subpaquetes del paquete de `bootstrap`).
 
-Esquema Postgres (`V1__init_schema.sql`): tablas `projects` (estado actual, con `completed`/`next_tasks`/`blocked`/`checks`/`events` como columnas `JSONB` mapeadas con `@JdbcTypeCode(SqlTypes.JSON)` — son listas cortas que siempre se reescriben completas en cada sync, no se normalizaron a tablas aparte) y `project_snapshots` (historial de progreso para el sparkline y el gráfico de detalle).
+Esquema Postgres (`V1__init_schema.sql` + `V2__project_last_modified.sql`): tablas `projects` (estado actual, con `completed`/`next_tasks`/`blocked`/`checks`/`events` como columnas `JSONB` mapeadas con `@JdbcTypeCode(SqlTypes.JSON)` — son listas cortas que siempre se reescriben completas en cada sync, no se normalizaron a tablas aparte; `source_last_modified` guarda la metadata que trae cada entrada del sync, usada para decidir si hay que actualizar) y `project_snapshots` (historial de progreso para el sparkline y el gráfico de detalle).
 
 ## Frontend
 

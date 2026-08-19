@@ -30,6 +30,17 @@ El usuario prefirió explícitamente que la sincronización sea "vía file" — 
 ### Un proyecto nuevo se crea automáticamente si el JSON trae un `id` desconocido
 Pedido explícito del usuario: el archivo de sync debe poder registrar un proyecto que el backend no conocía aún, sin un paso de registro manual previo. `ProjectSyncService.applySync` hace upsert — si el `id` no existe en `projects`, lo crea.
 
+### Protocolo de sync rediseñado: `progreso.json` + `nuevo.json` (mapa por id), reemplaza el archivo-por-proyecto
+Pedido explícito del usuario, antes de que este mecanismo llegara a producción (confirmado en `PROGRESS.md`: Etapa 5 sin desplegar, OpenClaw sin configurar todavía — sin costo de migración real). El modelo pasa de "un JSON por proyecto, nombrado `<id>.json`" a **dos archivos fijos**, cada uno un mapa `id -> datos`, que OpenClaw regenera completos en cada corrida tras barrer la carpeta `docs/` de todos los proyectos:
+- `progreso.json` — solo proyectos que ya existen; cada entrada trae su propio `last_modified` (metadata del estado, no de la subida) que el backend compara contra el guardado para decidir si actualiza o no.
+- `nuevo.json` — solo proyectos que no existen todavía, con los mismos campos requeridos que antes para crearlos.
+
+Consecuencias de diseño:
+- **Validación por entrada, no por archivo**: una entrada inválida (o un id que no corresponde al archivo — ej. un id desconocido en `progreso.json`) se descarta con warning, no rechaza el archivo completo. Antes, un solo campo mal formado invalidaba todo el JSON.
+- **El id ya no va como campo dentro del objeto** — es la clave del mapa.
+- **Reversión deliberada del principio "nunca borrar en silencio"** (`InboxSyncJob` antes movía cada archivo procesado a `processed/`/`rejected/`, nunca lo borraba). Ahora `progreso.json`/`nuevo.json` se borran siempre tras cada poll, haya habido cambios o no — porque OpenClaw los regenera frescos en su próximo ciclo y el histórico real ya vive en `project_snapshots`, no hace falta conservar los archivos de entrada.
+- **El mecanismo de "¿cambió o no?" pasa de un hash de contenido calculado por el job (`last_sync_hash`, SHA-256) a la metadata `last_modified` que trae el propio payload** (columna `projects.source_last_modified`, migración `V2__project_last_modified.sql`) — se elimina la duplicidad de tener dos mecanismos de detección de cambio.
+
 ## Frontend
 
 ### Angular 22 standalone + Tailwind, sin librería de componentes

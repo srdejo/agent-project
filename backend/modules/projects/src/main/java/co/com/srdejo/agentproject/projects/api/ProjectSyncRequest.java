@@ -1,5 +1,6 @@
 package co.com.srdejo.agentproject.projects.api;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -21,7 +22,7 @@ public record ProjectSyncRequest(
         List<String> blocked,
         List<Check> checks,
         List<Event> events,
-        String syncHash
+        Instant lastModified
 ) {
 
     public record Check(String name, boolean ok, String duration) {

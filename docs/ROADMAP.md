@@ -19,16 +19,16 @@ Checkboxes `[x]` solo se marcan cuando la tarea fue **verificada en el código**
 
 **Objetivo**: definir qué envía OpenClaw y cómo el backend lo valida (reemplaza la idea original de "parser de Markdown en el servidor" — ver `docs/DECISIONS.md`).
 
-- [x] Documentar el esquema JSON en `docs/SYNC_PROTOCOL.md`.
-- [x] `SyncPayloadParser` (`modules:parser`) — valida campos requeridos, enums, normaliza opcionales.
-- [ ] Pruebas unitarias de `SyncPayloadParser` contra payloads de ejemplo (válidos e inválidos).
+- [x] Documentar el esquema JSON en `docs/SYNC_PROTOCOL.md` (rediseñado 2026-08-19: `progreso.json`/`nuevo.json` agregados por id, en vez de un archivo por proyecto — ver `docs/DECISIONS.md`).
+- [x] `SyncPayloadParser.parseBatch` (`modules:parser`) — valida campos requeridos, enums, `last_modified`, normaliza opcionales; una entrada inválida no bloquea al resto del archivo.
+- [ ] Pruebas unitarias de `SyncPayloadParser.parseBatch` contra payloads de ejemplo (válidos e inválidos, batch mixto).
 
 ## Etapa 2 — Store de proyectos (Postgres + JPA) 🟢
 
 - [x] Esquema Flyway (`projects`, `project_snapshots`).
 - [x] `ProjectEntity`/`ProjectSnapshotEntity` + `ProjectJpaRepository`/`ProjectSnapshotJpaRepository`.
-- [x] `ProjectSyncService` (upsert con dedupe por hash, crea el proyecto si no existía).
-- [ ] Pruebas unitarias/`@DataJpaTest` de `ProjectSyncService` (creación, actualización, no-op si el hash no cambió).
+- [x] `ProjectSyncService` (upsert, crea el proyecto si no existía; dedupe por `source_last_modified` en vez de hash SHA-256 desde el rediseño del protocolo).
+- [ ] Pruebas unitarias/`@DataJpaTest` de `ProjectSyncService` (creación, actualización, no-op si `last_modified` no cambió).
 
 ## Etapa 3 — API de progreso 🟢
 
@@ -49,8 +49,8 @@ Checkboxes `[x]` solo se marcan cuando la tarea fue **verificada en el código**
 
 **Objetivo**: que el dashboard, corriendo en `nolost-vps`, se mantenga actualizado con el avance real de `consulting`, `distriapp`, `hotel`, `nolost` y `agent-project`.
 
-- [x] `InboxSyncJob` (`modules:progress`, `@Scheduled`) — escanea el inbox, aplica los cambios, mueve archivos a `processed/`/`rejected/`.
-- [x] Verificado localmente: archivo de ejemplo en el inbox → aparece en `GET /api/projects` tras el poll.
+- [x] `InboxSyncJob` (`modules:progress`, `@Scheduled`, cada `SYNC_POLL_INTERVAL_MS` — default 6 horas) — busca `progreso.json`/`nuevo.json`, valida y aplica entrada por entrada, borra ambos archivos siempre al terminar.
+- [x] Verificado localmente con el protocolo nuevo (2026-08-19): creación vía `nuevo.json`, rechazo de id desconocido en `progreso.json`, actualización con `last_modified` distinto, no-op con `last_modified` igual (probado enviando un `progress` distinto con el mismo timestamp — se ignoró correctamente), borrado de ambos archivos tras cada poll. Todo verificado por `curl` contra el backend local.
 - [x] `deploy.ps1` (build + scp + restart de `agent-project`/nginx en `nolost-vps`).
 - [x] `docs/DEPLOYMENT.md` (systemd, nginx, estructura de directorios esperada en el VPS).
 - [ ] Desplegar realmente en `nolost-vps` (requiere acceso SSH que esta sesión no tiene).

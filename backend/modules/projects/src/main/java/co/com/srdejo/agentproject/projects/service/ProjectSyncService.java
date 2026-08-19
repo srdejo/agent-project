@@ -25,6 +25,11 @@ public class ProjectSyncService implements ProjectSyncPort {
     }
 
     @Override
+    public boolean exists(String id) {
+        return projects.existsById(id);
+    }
+
+    @Override
     @Transactional
     public SyncOutcome applySync(ProjectSyncRequest request) {
         Instant now = Instant.now();
@@ -32,7 +37,7 @@ public class ProjectSyncService implements ProjectSyncPort {
         ProjectEntity entity = projects.findById(request.id())
                 .orElseGet(() -> ProjectEntity.create(request.id(), now));
 
-        if (!isNew && entity.hasSameSyncHash(request.syncHash())) {
+        if (!isNew && entity.hasSameLastModified(request.lastModified())) {
             return SyncOutcome.UNCHANGED;
         }
 
@@ -50,7 +55,7 @@ public class ProjectSyncService implements ProjectSyncPort {
                 request.blocked(),
                 toChecks(request.checks()),
                 toEvents(request.events()),
-                request.syncHash(),
+                request.lastModified(),
                 now
         );
         projects.save(entity);

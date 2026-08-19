@@ -60,8 +60,8 @@ public class ProjectEntity {
     @Column(nullable = false, columnDefinition = "jsonb")
     private List<AgentEvent> events = List.of();
 
-    @Column(name = "last_sync_hash")
-    private String lastSyncHash;
+    @Column(name = "source_last_modified")
+    private Instant sourceLastModified;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -84,7 +84,7 @@ public class ProjectEntity {
     public void applySync(String name, String repo, String stage, String status, int progress,
                            String updatedLabel, String commitSha, String verifyStatus,
                            List<String> completed, List<String> nextTasks, List<String> blocked,
-                           List<TaskCheck> checks, List<AgentEvent> events, String syncHash, Instant now) {
+                           List<TaskCheck> checks, List<AgentEvent> events, Instant sourceLastModified, Instant now) {
         this.name = name;
         this.repo = repo;
         this.stage = stage;
@@ -98,12 +98,12 @@ public class ProjectEntity {
         this.blocked = blocked;
         this.checks = checks;
         this.events = events;
-        this.lastSyncHash = syncHash;
+        this.sourceLastModified = sourceLastModified;
         this.updatedAt = now;
     }
 
-    public boolean hasSameSyncHash(String syncHash) {
-        return syncHash.equals(this.lastSyncHash);
+    public boolean hasSameLastModified(Instant sourceLastModified) {
+        return sourceLastModified.equals(this.sourceLastModified);
     }
 
     public String getId() {
@@ -160,6 +160,10 @@ public class ProjectEntity {
 
     public List<AgentEvent> getEvents() {
         return events;
+    }
+
+    public Instant getSourceLastModified() {
+        return sourceLastModified;
     }
 
     public record TaskCheck(String name, boolean ok, String duration) {
