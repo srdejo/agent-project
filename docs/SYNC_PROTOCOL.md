@@ -2,6 +2,21 @@
 
 Contrato entre OpenClaw (u otro agente, corriendo en la máquina del desarrollador) y el backend de `agent-project` para mantener el dashboard actualizado. El backend **no** hace polling de Git ni parsea Markdown — solo lee JSON que otro proceso deposita en su inbox.
 
+## Cómo saber si el backend está vivo antes de subir nada
+
+`agent-project` corre en `nolost-vps` **desplegado y en vivo** desde 2026-08-19 como servicio `systemd` (`agent-project.service`, puerto `8083` loopback) — **no** como contenedor Docker, no hay nada que "levantar" aparte de eso. Antes de asumir que no está desplegado, chequear:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://agent.srdejo.com.co/api/projects   # 200 = vivo
+ssh srdejo@nolost-vps "systemctl is-active agent-project"                           # active = corriendo
+```
+
+Si está `active`/`200`, alcanza con subir los archivos al inbox — no hace falta desplegar nada. El poll corre cada `SYNC_POLL_INTERVAL_MS` (default 6 horas). Para forzar que los procese ya sin esperar el poll, reiniciar el servicio (el job corre inmediatamente al arrancar, antes del primer delay):
+
+```bash
+ssh srdejo@nolost-vps "sudo systemctl restart agent-project"
+```
+
 ## Dos archivos fijos, no uno por proyecto
 
 En cada corrida, OpenClaw barre la carpeta `docs/` de todos los proyectos registrados y genera **como máximo dos archivos**, cada uno un mapa `id de proyecto -> datos`:
@@ -14,7 +29,9 @@ En cada corrida, OpenClaw barre la carpeta `docs/` de todos los proyectos regist
 <deploy-dir>/data/inbox/nuevo.json
 ```
 
-Ejemplo real (working dir de `bootRun`/el jar en prod): `agent-project/backend/bootstrap/data/inbox/progreso.json`. (El path `backend/data/inbox/` que documentaba una versión anterior de este archivo estaba mal — `gradlew bootRun`/el jar corren con working dir en el módulo `bootstrap`.)
+Rutas reales:
+- **Prod (`nolost-vps`)**: `/home/srdejo/agent-project/data/inbox/progreso.json` — `WorkingDirectory` del `systemd` unit apunta directo ahí (ver `docs/DEPLOYMENT.md`).
+- **Local (`gradlew bootRun`)**: `agent-project/backend/bootstrap/data/inbox/progreso.json` — el working dir de `bootRun` es el módulo `bootstrap`, no la raíz de `backend/`. (El path `backend/data/inbox/` que documentaba una versión anterior de este archivo estaba mal.)
 
 El backend escanea el inbox cada `SYNC_POLL_INTERVAL_MS` (default 6 horas — pensado para la cadencia con la que corre OpenClaw, no para reaccionar al instante). Si alguno de los dos archivos existe, se procesa **entero** (cada entrada del mapa se valida y aplica de forma independiente — una entrada mala no bloquea al resto) y **se borra siempre al terminar**, haya habido cambios o no. OpenClaw regenera estos archivos frescos en cada una de sus propias corridas; el histórico real vive en la tabla `project_snapshots`, no en el filesystem.
 
