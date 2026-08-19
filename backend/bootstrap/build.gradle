@@ -15,6 +15,7 @@ dependencies {
     implementation libs.flyway.core
     implementation libs.flyway.postgresql
     runtimeOnly libs.postgresql
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
     testImplementation libs.spring.boot.starter.test
 }
 
