@@ -33,8 +33,8 @@ export class ProjectList {
 
   readonly stats = computed(() => this.response().stats);
 
-  readonly sortKey = signal<SortKey | null>(null);
-  readonly sortDir = signal<SortDir>('asc');
+  readonly sortKey = signal<SortKey | null>('progress');
+  readonly sortDir = signal<SortDir>('desc');
 
   readonly rows = computed<ProjectRow[]>(() => {
     const key = this.sortKey();
