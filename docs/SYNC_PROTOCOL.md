@@ -11,11 +11,7 @@ curl -s -o /dev/null -w '%{http_code}\n' https://agent.srdejo.com.co/api/project
 ssh srdejo@nolost-vps "systemctl is-active agent-project"                           # active = corriendo
 ```
 
-Si está `active`/`200`, alcanza con subir los archivos al inbox — no hace falta desplegar nada. El poll corre cada `SYNC_POLL_INTERVAL_MS` (default 6 horas). Para forzar que los procese ya sin esperar el poll, reiniciar el servicio (el job corre inmediatamente al arrancar, antes del primer delay):
-
-```bash
-ssh srdejo@nolost-vps "sudo systemctl restart agent-project"
-```
+Si está `active`/`200`, alcanza con subir los archivos al inbox — no hace falta desplegar ni reiniciar nada. La detección es reactiva (`WatchService` sobre `inboxDir`, ver `InboxSyncJob`): apenas se crea o modifica `progreso.json`/`nuevo.json` en el inbox, el backend lo procesa (con un debounce de ~400ms para coalescer ambos archivos en un solo ciclo si llegan casi juntos).
 
 ## Consultar el API antes de clasificar progreso.json vs nuevo.json
 
@@ -43,7 +39,7 @@ Rutas reales:
 - **Prod (`nolost-vps`)**: `/home/srdejo/agent-project/data/inbox/progreso.json` — `WorkingDirectory` del `systemd` unit apunta directo ahí (ver `docs/DEPLOYMENT.md`).
 - **Local (`gradlew bootRun`)**: `agent-project/backend/bootstrap/data/inbox/progreso.json` — el working dir de `bootRun` es el módulo `bootstrap`, no la raíz de `backend/`. (El path `backend/data/inbox/` que documentaba una versión anterior de este archivo estaba mal.)
 
-El backend escanea el inbox cada `SYNC_POLL_INTERVAL_MS` (default 6 horas — pensado para la cadencia con la que corre OpenClaw, no para reaccionar al instante). Si alguno de los dos archivos existe, se procesa **entero** (cada entrada del mapa se valida y aplica de forma independiente — una entrada mala no bloquea al resto) y **se borra siempre al terminar**, haya habido cambios o no. OpenClaw regenera estos archivos frescos en cada una de sus propias corridas; el histórico real vive en la tabla `project_snapshots`, no en el filesystem.
+El backend reacciona en cuanto alguno de los dos archivos aparece en el inbox (`WatchService`, sin polling). Se procesa **entero** (cada entrada del mapa se valida y aplica de forma independiente — una entrada mala no bloquea al resto) y **se borra siempre al terminar**, haya habido cambios o no. OpenClaw regenera estos archivos frescos en cada una de sus propias corridas; el histórico real vive en la tabla `project_snapshots`, no en el filesystem.
 
 ## Cómo subirlos de forma atómica
 

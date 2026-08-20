@@ -64,7 +64,6 @@ DB_NAME=agent_project
 DB_USER=agent_project
 DB_PASSWORD=<password-real>
 SYNC_INBOX_DIR=/home/srdejo/agent-project/data/inbox
-SYNC_POLL_INTERVAL_MS=21600000
 ```
 
 Instalación (ya hecha, dejar documentado para el próximo redeploy de cero):

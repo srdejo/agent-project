@@ -21,7 +21,6 @@ server:
 agent-project:
   sync:
     inbox-dir: ${SYNC_INBOX_DIR:./data/inbox}
-    poll-interval-ms: ${SYNC_POLL_INTERVAL_MS:21600000}
 
 ---
 spring:
