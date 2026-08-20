@@ -42,14 +42,16 @@ Ninguna en ejecución. Se cerró el rediseño del protocolo de sync y el deploy 
 
 ## En progreso
 
-Nada.
+Nada. El roadmap documentado está 100% completado y verificado.
 
 ## Siguiente
 
-En orden recomendado:
+Definir con el usuario qué sigue: nuevas features del dashboard, mejoras al sync, o dar por cerrado el proyecto.
 
-1. **Configurar OpenClaw** (máquina del usuario) para que barra `docs/` de cada proyecto registrado y genere/envíe `progreso.json`/`nuevo.json` a `agent.srdejo.com.co` (o directo al inbox del servidor) según el contrato de `docs/SYNC_PROTOCOL.md` — es lo único que falta para que el dashboard en producción reciba datos reales.
-2. **Pruebas unitarias** de `SyncPayloadParser.parseBatch` (batch mixto válido/inválido) y `ProjectSyncService` (creación, actualización, no-op por `last_modified`) — marcadas sin verificar en `ROADMAP.md` Etapas 1 y 2. Es lo único que queda pendiente en todo el roadmap.
+## Completado (adición 2026-08-19)
+
+- **Pruebas unitarias verificadas** (Etapas 1 y 2, 2026-08-19): `SyncPayloadParserTest` (8 tests) y `ProjectSyncServiceTest` (4 tests) — escritas en commit `725261a`, corridas con `./gradlew :modules:parser:test :modules:projects:test` en verde (BUILD SUCCESSFUL in 8s). Cubren: parsing de entry válida completa, normalización de opcionales ausentes, rechazo de entry sin campo requerido sin bloquear las demás, `progress` fuera de rango, `status` inválido, `tasks[].status` inválido, `last_modified` no ISO-8601, JSON raíz no-objeto, JSON inválido (parser); creación, actualización por `last_modified` distinto, no-op por `last_modified` igual, `exists()` (service).
+- **Sync automático vía OpenClaw** configurado y en producción: barre `docs/` de los 9 proyectos, genera `progreso.json`/`nuevo.json`, los sube al inbox del VPS sin reiniciar el servicio. Corre a las 8am/12pm/6pm y bajo demanda.
 
 ## Bloqueadores
 
