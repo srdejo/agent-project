@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ProjectApiService } from '../../core/services/project-api.service';
@@ -16,6 +16,9 @@ interface GlobalEvent extends AgentEvent {
   color: string;
 }
 
+type SortKey = 'name' | 'progress';
+type SortDir = 'asc' | 'desc';
+
 const EMPTY_RESPONSE: ProjectListResponse = { projects: [], stats: { count: 0, avg: 0, blocked: 0, verified: 0 }, lastSync: null };
 
 @Component({
@@ -30,13 +33,35 @@ export class ProjectList {
 
   readonly stats = computed(() => this.response().stats);
 
-  readonly rows = computed<ProjectRow[]>(() =>
-    this.response().projects.map((project) => ({
+  readonly sortKey = signal<SortKey | null>(null);
+  readonly sortDir = signal<SortDir>('asc');
+
+  readonly rows = computed<ProjectRow[]>(() => {
+    const key = this.sortKey();
+    const dir = this.sortDir() === 'asc' ? 1 : -1;
+    const projects = [...this.response().projects];
+
+    if (key === 'name') {
+      projects.sort((a, b) => a.name.localeCompare(b.name) * dir);
+    } else if (key === 'progress') {
+      projects.sort((a, b) => (a.progress - b.progress) * dir);
+    }
+
+    return projects.map((project) => ({
       project,
       dot: statusColor(project.status),
       tasksRatio: `${project.tasksDone}/${project.tasksTotal}`,
-    })),
-  );
+    }));
+  });
+
+  sortBy(key: SortKey): void {
+    if (this.sortKey() === key) {
+      this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortKey.set(key);
+      this.sortDir.set(key === 'progress' ? 'desc' : 'asc');
+    }
+  }
 
   readonly activity = computed<GlobalEvent[]>(() => {
     const events: GlobalEvent[] = [];

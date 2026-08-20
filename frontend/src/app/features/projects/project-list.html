@@ -19,9 +19,38 @@
       </div>
     </div>
 
-    <div class="flex items-baseline justify-between mb-3.5">
+    <div class="flex items-baseline justify-between mb-3.5 gap-3">
       <h2 class="text-[13px] font-semibold tracking-wide">All projects</h2>
-      <span class="font-mono text-[10px] text-ink-subtle hidden sm:inline">SOURCE: ROADMAP.md · PROGRESS.md · GIT</span>
+      <div class="flex items-center gap-3.5">
+        <div class="flex items-center gap-2.5 font-mono text-[10px] tracking-wide">
+          <span class="text-ink-subtle">SORT</span>
+          <button
+            type="button"
+            (click)="sortBy('name')"
+            class="flex items-center gap-1 cursor-pointer transition-colors"
+            [class.text-ink]="sortKey() === 'name'"
+            [class.text-ink-subtle]="sortKey() !== 'name'"
+          >
+            NAME
+            @if (sortKey() === 'name') {
+              <span>{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
+            }
+          </button>
+          <button
+            type="button"
+            (click)="sortBy('progress')"
+            class="flex items-center gap-1 cursor-pointer transition-colors"
+            [class.text-ink]="sortKey() === 'progress'"
+            [class.text-ink-subtle]="sortKey() !== 'progress'"
+          >
+            PROGRESS
+            @if (sortKey() === 'progress') {
+              <span>{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
+            }
+          </button>
+        </div>
+        <span class="font-mono text-[10px] text-ink-subtle hidden lg:inline">SOURCE: ROADMAP.md · PROGRESS.md · GIT</span>
+      </div>
     </div>
 
     <div class="border-t border-surface-border">
