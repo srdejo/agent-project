@@ -22,7 +22,7 @@ La plataforma no pretende reemplazar `ROADMAP.md`, `PROGRESS.md` ni Git. Su obje
 
 ## 2. Principio fundamental
 
-Diferenciar entre: 1) fuente de verdad del proyecto (repo: ROADMAP.md, PROGRESS.md, DECISIONS.md, ARCHITECTURE.md, código, Git, tests, Docker/CI), 2) tracking histórico (base de datos), 3) visualización (dashboard). El dashboard nunca sustituye esos archivos; el proyecto debe seguir funcionando aunque el dashboard no esté disponible.
+Diferenciar entre: 1) fuente de verdad del proyecto (repo: ROADMAP.md, PROGRESS.md, DECISIONS.md, ARCHITECTURE.md, código, Git, tests, CI), 2) tracking histórico (base de datos), 3) visualización (dashboard). El dashboard nunca sustituye esos archivos; el proyecto debe seguir funcionando aunque el dashboard no esté disponible.
 
 ## 3. ¿Es necesaria una base de datos?
 
@@ -64,7 +64,7 @@ Estados: `TODO`, `IN_PROGRESS`, `BLOCKED`, `COMPLETED`, `CANCELLED`. `verified` 
 
 ## 7. Verificación
 
-El proyecto puede definir comandos de verificación (`./gradlew test`, `npm run test`, `docker compose up --build`). OpenClaw los ejecuta antes de reportar una tarea como completada.
+El proyecto puede definir comandos de verificación (`./gradlew test`, `npm run test`, `npm run build`). OpenClaw los ejecuta antes de reportar una tarea como completada.
 
 ## 8. Tarea automática `project-progress-sync`
 
@@ -112,7 +112,7 @@ Si el repo es público el dashboard puede enlazarlo directamente, pero la API no
 OpenClaw → REST → Project Control API → PostgreSQL → Angular Dashboard
 ```
 
-Backend: Spring Boot + PostgreSQL + REST. Frontend: Angular + Tailwind. Agente: OpenClaw. Deployment: Docker Compose + Nginx + HTTPS.
+Backend: Spring Boot + PostgreSQL + REST. Frontend: Angular + Tailwind. Agente: OpenClaw. Deployment: jar + systemd + Nginx + HTTPS.
 
 ## 19. Primera versión funcional
 

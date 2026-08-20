@@ -75,7 +75,7 @@ Ya no usa datos mock (`ProjectMockService` fue eliminado) — ambas vistas consu
 
 ## Cómo correrlo
 
-- Backend: `cd backend && docker-compose up -d && ./gradlew bootRun` (requiere Postgres local — `docker-compose.yml` en `backend/`). Nota: el directorio de trabajo de `bootRun` es `backend/bootstrap/`, así que `./data/inbox` (default) se resuelve ahí salvo que se fije `SYNC_INBOX_DIR` explícitamente.
+- Backend: `cd backend && ./gradlew bootRun` (requiere la base `agent_project` en la instancia Postgres local/nativa — ver `infra/`). Nota: el directorio de trabajo de `bootRun` es `backend/bootstrap/`, así que `./data/inbox` (default) se resuelve ahí salvo que se fije `SYNC_INBOX_DIR` explícitamente.
 - Frontend: `cd frontend && npm install && npm start` (proxy a `localhost:8080/api` vía `proxy.conf.json`).
 
 Verificado en esta sesión: `./gradlew build` compila, `bootRun` levanta contra Postgres local, un JSON de ejemplo depositado en el inbox se sincroniza y aparece en `GET /api/projects`/`GET /api/projects/{id}`, y el frontend (`npm run build` + `npm start`) sirve y consume esos mismos endpoints vía el proxy — verificado por `curl`, no visualmente en un navegador real.

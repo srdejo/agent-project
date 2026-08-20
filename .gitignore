@@ -1,7 +1,7 @@
 # Backend (Gradle)
 backend/.gradle/
 backend/**/build/
-backend/bin/
+backend/**/bin/
 !backend/gradle/wrapper/gradle-wrapper.jar
 backend/out/
 backend/**/data/
