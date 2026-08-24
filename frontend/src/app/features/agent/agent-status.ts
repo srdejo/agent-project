@@ -16,7 +16,7 @@ import { AgentMonitorService } from '../../core/services/agent-monitor.service';
         <a routerLink="/" class="font-mono text-[10px] text-ink-muted hover:text-ink transition-colors">BACK TO PROJECTS</a>
       </div>
 
-      <section class="max-w-2xl border border-surface-border bg-surface-card">
+      <section class="w-full border border-surface-border bg-surface-card">
         <div class="flex items-center justify-between gap-4 px-4 py-4 border-b border-surface-border">
           <div class="flex items-center gap-2.5">
             <span class="w-2 h-2 rounded-full" [class.bg-status-ok]="monitor.status() === 'online'" [class.bg-red-600]="monitor.status() === 'offline'" [class.bg-status-warn]="monitor.status() !== 'online' && monitor.status() !== 'offline'"></span>
@@ -28,16 +28,24 @@ import { AgentMonitorService } from '../../core/services/agent-monitor.service';
           <div class="font-mono text-[10px] tracking-wider text-ink-muted">CURRENT ACTIVITY</div>
           <div class="text-lg font-semibold mt-1">{{ monitor.activity() }}</div>
         </div>
-        <div class="bg-[#17191c] text-[#d8ddd5] px-4 py-3 font-mono text-[11px] min-h-24 max-h-80 overflow-y-auto" aria-live="polite">
+        <div class="bg-[#17191c] text-[#d8ddd5] px-4 py-3 font-mono text-[11px] h-[290px] sm:h-[390px] overflow-hidden" aria-live="polite">
           @if (monitor.logs().length === 0) {
             <div class="text-[#7f8980]">Waiting for agent events...</div>
           }
           @for (log of monitor.logs(); track log.timestamp + log.message) {
-            <div class="grid grid-cols-[58px_92px_minmax(0,1fr)] gap-2 items-baseline py-1.5 border-b border-[#30353a] last:border-b-0 leading-5">
-              <span class="text-[#7f8980]">[{{ log.timestamp | date:'HH:mm:ss' }}]</span>
-              <span [class.text-[#8bd5a7]]="log.type === 'INBOUND'" [class.text-[#f0c36a]]="log.type === 'TOOL'" [class.text-[#9db7ff]]="log.type === 'AI'" [class.text-[#f07878]]="log.type === 'ERROR'">{{ log.badge }}</span>
-              <span class="min-w-0 break-words">{{ log.message }}</span>
-            </div>
+            @if ($index < 6) {
+              <div class="grid grid-cols-[58px_92px_minmax(0,1fr)] gap-2 items-baseline py-1.5 border-b border-[#30353a] last:border-b-0 leading-5">
+                <span class="text-[#7f8980]">[{{ log.timestamp | date:'HH:mm:ss' }}]</span>
+                <span [class.text-[#8bd5a7]]="log.type === 'INBOUND'" [class.text-[#f0c36a]]="log.type === 'TOOL'" [class.text-[#9db7ff]]="log.type === 'AI'" [class.text-[#f07878]]="log.type === 'ERROR'">{{ log.badge }}</span>
+                <span class="min-w-0 break-words">{{ log.message }}</span>
+              </div>
+            } @else if ($index < 10) {
+              <div class="hidden sm:grid grid-cols-[58px_92px_minmax(0,1fr)] gap-2 items-baseline py-1.5 border-b border-[#30353a] last:border-b-0 leading-5">
+                <span class="text-[#7f8980]">[{{ log.timestamp | date:'HH:mm:ss' }}]</span>
+                <span [class.text-[#8bd5a7]]="log.type === 'INBOUND'" [class.text-[#f0c36a]]="log.type === 'TOOL'" [class.text-[#9db7ff]]="log.type === 'AI'" [class.text-[#f07878]]="log.type === 'ERROR'">{{ log.badge }}</span>
+                <span class="min-w-0 break-words">{{ log.message }}</span>
+              </div>
+            }
           }
         </div>
       </section>
