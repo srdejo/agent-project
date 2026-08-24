@@ -32,8 +32,12 @@ import { AgentMonitorService } from '../../core/services/agent-monitor.service';
           @if (monitor.logs().length === 0) {
             <div class="text-[#7f8980]">Waiting for agent events...</div>
           }
-          @for (log of monitor.logs(); track $index) {
-            <div class="leading-5"><span class="text-[#7f8980]">{{ log.timestamp | date:'HH:mm:ss' }}</span> {{ log.level }} {{ log.message }}</div>
+          @for (log of monitor.logs(); track log.timestamp + log.message) {
+            <div class="grid grid-cols-[58px_92px_minmax(0,1fr)] gap-2 items-baseline py-1.5 border-b border-[#30353a] last:border-b-0 leading-5">
+              <span class="text-[#7f8980]">[{{ log.timestamp | date:'HH:mm:ss' }}]</span>
+              <span [class.text-[#8bd5a7]]="log.type === 'INBOUND'" [class.text-[#f0c36a]]="log.type === 'TOOL'" [class.text-[#9db7ff]]="log.type === 'AI'" [class.text-[#f07878]]="log.type === 'ERROR'">{{ log.badge }}</span>
+              <span class="min-w-0 break-words">{{ log.message }}</span>
+            </div>
           }
         </div>
       </section>

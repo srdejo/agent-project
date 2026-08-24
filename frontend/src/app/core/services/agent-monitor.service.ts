@@ -6,6 +6,8 @@ export type LogLevel = 'INFO' | 'WARN' | 'ERROR';
 export interface AgentLog {
   timestamp: string;
   level: LogLevel;
+  type: 'INBOUND' | 'TOOL' | 'AI' | 'ERROR' | 'INFO';
+  badge: string;
   message: string;
 }
 
@@ -45,14 +47,30 @@ export class AgentMonitorService {
         this.activity.set(message['activity'] ?? '');
       }
       if (message['type'] === 'log_event') {
-        this.logs.update(logs => [...logs, {
+        const parsed = this.parseLog(message['message'] ?? '');
+        this.logs.update(logs => [{
           timestamp: message['timestamp'] ?? new Date().toISOString(),
           level: (message['level'] ?? 'INFO') as LogLevel,
-          message: message['message'] ?? '',
-        }].slice(-200));
+          type: parsed.type,
+          badge: parsed.badge,
+          message: parsed.message,
+        }, ...logs].slice(0, 200));
       }
     } catch {
       // Events are external input; a malformed event must not break the dashboard.
     }
+  }
+
+  private parseLog(message: string): Pick<AgentLog, 'type' | 'badge' | 'message'> {
+    const match = message.match(/^\[([A-Z]+)]\s*(.*)$/s);
+    const type = match?.[1];
+    const text = match?.[2] ?? message;
+    const event = {
+      INBOUND: { type: 'INBOUND' as const, badge: '📥 Mensaje' },
+      TOOL: { type: 'TOOL' as const, badge: '🛠️ Tool' },
+      AI: { type: 'AI' as const, badge: '🧠 Pensando' },
+      ERROR: { type: 'ERROR' as const, badge: '❌ Error' },
+    }[type ?? ''];
+    return event ? { ...event, message: text } : { type: 'INFO', badge: 'ℹ️ Info', message: text };
   }
 }
