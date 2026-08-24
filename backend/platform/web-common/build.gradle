@@ -1,4 +1,5 @@
 dependencies {
     implementation rootProject.libs.spring.boot.starter.web
+    implementation rootProject.libs.spring.boot.starter.websocket
     implementation rootProject.libs.spring.boot.starter.validation
 }

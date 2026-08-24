@@ -67,3 +67,10 @@ Checkboxes `[x]` solo se marcan cuando la tarea fue **verificada en el código**
 - [x] Ajustar layout de la vista de detalle (`project-detail.html`): título y % de progreso con tamaños de fuente responsivos (`text-2xl sm:text-4xl`, `text-3xl sm:text-5xl`), meta-línea (repo/etapa/estado) con `flex-wrap` y separadores `·` ocultos en mobile. El resto de las grillas (historial, completado/siguiente/bloqueado, evidencia, actividad) ya usaban `grid-cols-1` por defecto y no requirieron cambios.
 - [x] Revisar navegación/header (`app.html`) para pantallas chicas: padding, gaps y tamaños de fuente reducidos en mobile, "Project Control Center" con `truncate` para evitar que empuje el bloque de la derecha fuera del viewport.
 - [x] Verificar en navegador móvil real: desplegado a `nolost-vps` (build de producción, nginx reiniciado, `200` en `/` y `/api/projects`) y confirmado por el usuario contra `https://agent.srdejo.com.co` en su iPhone real (2026-08-19, capturas en el listado de proyectos) — stats en grid 2x2, filas de proyecto sin overflow horizontal, progreso/porcentaje legibles.
+
+## Etapa 7 — Monitoreo operativo del agente 🟡
+
+- [x] Endpoint WebSocket nativo `/ws/agent` en Spring Boot, con cliente agente autenticado por `AGENT_WS_TOKEN`, heartbeat cada 30s y timeout offline de 45s.
+- [x] Daemon local Node.js con reconexión automática y API `setAgentStatus`/`logEvent`.
+- [x] Indicador global, estado actual y consola de logs limitada a 200 eventos en Angular.
+- [ ] Aplicar la configuración nginx/token en producción y validar el primer evento real desde OpenClaw.

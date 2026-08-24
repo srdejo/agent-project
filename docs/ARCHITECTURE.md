@@ -30,6 +30,8 @@ OpenClaw (máquina del dev) --scp--> data/inbox/{progreso,nuevo}.json --poll (In
                                                                               Frontend (dashboard)
 ```
 
+La presencia operativa del agente usa además un WebSocket nativo en `/ws/agent`. El cliente local (`infra/openclaw-daemon`) es el emisor autenticado; Angular es un receptor de solo lectura. El estado y los últimos 200 logs viven en memoria del backend, por lo que un reinicio devuelve el agente a `offline` y no altera el historial de proyectos.
+
 No existe un endpoint HTTP de escritura pública — el único mecanismo de entrada es el archivo en disco, que el proceso del backend controla.
 
 ## Backend

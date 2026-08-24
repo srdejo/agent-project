@@ -21,6 +21,8 @@ server:
 agent-project:
   sync:
     inbox-dir: ${SYNC_INBOX_DIR:./data/inbox}
+  agent:
+    token: ${AGENT_WS_TOKEN:}
 
 ---
 spring:

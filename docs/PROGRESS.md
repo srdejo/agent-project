@@ -4,11 +4,11 @@ Estado del proyecto a **2026-08-19**. Actualizar este archivo cada vez que se ci
 
 ## Estado actual
 
-Etapa 5 — Sync recurrente + deploy a `nolost-vps` (🟡 protocolo de sync rediseñado y verificado en local; **ya desplegado y en vivo** en `https://agent.srdejo.com.co`; solo falta que OpenClaw genere/envíe los archivos de verdad).
+Etapa 7 — Monitoreo operativo del agente (🟡 implementado y compilado localmente; falta aplicar nginx/token en producción y validar el primer evento real).
 
 ## Tarea actual
 
-Ninguna en ejecución. Se cerró el rediseño del protocolo de sync y el deploy real a `nolost-vps`.
+WebSocket de presencia implementado en Spring Boot, daemon local Node.js con reconexión, y monitor global Angular con estado/logs en vivo.
 
 ## Completado
 
@@ -56,6 +56,10 @@ Definir con el usuario qué sigue: nuevas features del dashboard, mejoras al syn
 ## Bloqueadores
 
 Ninguno.
+
+## Próximo paso
+
+Configurar `AGENT_WS_TOKEN` y la ruta `/ws/` en nginx del VPS, desplegar y arrancar `infra/openclaw-daemon` junto a OpenClaw.
 
 ## Última actualización
 

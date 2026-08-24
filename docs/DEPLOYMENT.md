@@ -58,6 +58,7 @@ WantedBy=multi-user.target
 `.env` (chmod 600, no versionado):
 ```
 SPRING_PROFILES_ACTIVE=prod
+AGENT_WS_TOKEN=<random-long-token>
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=agent_project
@@ -93,6 +94,15 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8083/ws/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 75s;
     }
 
     location / {

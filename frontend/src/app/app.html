@@ -5,10 +5,10 @@
       <span class="text-[13px] sm:text-[17px] font-normal text-ink-muted truncate">Project Control Center</span>
     </div>
     <div class="flex items-center gap-3 sm:gap-5 font-mono text-[10px] sm:text-[11px] text-ink-muted flex-none">
-      <span class="flex items-center gap-1.5">
-        <span class="w-1.5 h-1.5 rounded-full bg-status-ok inline-block"></span>
-        <span>PUBLIC TRACKING</span>
-      </span>
+      <a routerLink="/agent" class="flex items-center gap-1.5 hover:text-ink transition-colors" [title]="'View agent status: ' + monitor.status()" aria-label="View agent status">
+        <span class="w-1.5 h-1.5 rounded-full inline-block" [class.bg-status-ok]="monitor.status() === 'online'" [class.bg-status-warn]="monitor.status() === 'thinking' || monitor.status() === 'executing_tool'" [class.bg-red-600]="monitor.status() === 'offline' || monitor.status() === 'error'"></span>
+        <span>{{ monitor.status() === 'offline' ? 'OFFLINE' : monitor.status() === 'online' ? 'ONLINE' : 'PROCESSING' }}</span>
+      </a>
       <span class="hidden sm:inline uppercase">
         @if (lastSync(); as sync) {
           LAST SYNC {{ sync | date: 'dd MMM y HH:mm':'-0500' }} COT
@@ -18,6 +18,24 @@
       </span>
     </div>
   </header>
+
+  <section class="mx-4 sm:mx-6 md:mx-10 mt-6 border border-surface-border bg-surface-card">
+    <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-surface-border">
+      <div>
+        <div class="font-mono text-[10px] tracking-wider text-ink-muted">CURRENT AGENT STATUS</div>
+        <div class="text-lg font-semibold mt-1">{{ monitor.activity() }}</div>
+      </div>
+      <span class="font-mono text-[10px]" [class.text-status-ok]="monitor.status() === 'online'" [class.text-status-warn]="monitor.status() !== 'online' && monitor.status() !== 'offline'" [class.text-red-600]="monitor.status() === 'offline'">{{ monitor.status() | uppercase }}</span>
+    </div>
+    <div #logsContainer class="bg-[#17191c] text-[#d8ddd5] px-4 py-3 font-mono text-[11px] min-h-24 max-h-52 overflow-y-auto" aria-live="polite">
+      @if (monitor.logs().length === 0) {
+        <div class="text-[#7f8980]">Waiting for agent events...</div>
+      }
+      @for (log of monitor.logs(); track $index) {
+        <div class="leading-5"><span class="text-[#7f8980]">{{ log.timestamp | date:'HH:mm:ss' }}</span> <span [class.text-[#8bd5a7]]="log.level === 'INFO'" [class.text-[#f0c36a]]="log.level === 'WARN'" [class.text-[#f07878]]="log.level === 'ERROR'">{{ log.level }}</span> {{ log.message }}</div>
+      }
+    </div>
+  </section>
 
   <router-outlet />
 </div>
