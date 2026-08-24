@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ProjectApiService } from '../../core/services/project-api.service';
-import { AgentEvent, ProjectListResponse, ProjectSummary } from '../../core/models/project';
+import { AgentEvent, BlockedTask, ProjectListResponse, ProjectSummary } from '../../core/models/project';
 import { eventColor, statusColor } from '../../shared/format/progress-chart';
 
 interface ProjectRow {
@@ -32,6 +32,32 @@ export class ProjectList {
   private readonly response = toSignal(this.api.list(), { initialValue: EMPTY_RESPONSE });
 
   readonly stats = computed(() => this.response().stats);
+
+  readonly blockedTasksOpen = signal(false);
+  readonly blockedTasks = signal<BlockedTask[] | null>(null);
+  readonly blockedTasksLoading = signal(false);
+
+  openBlockedTasks(): void {
+    this.blockedTasksOpen.set(true);
+    if (this.blockedTasks() !== null) {
+      return;
+    }
+    this.blockedTasksLoading.set(true);
+    this.api.blockedTasks().subscribe({
+      next: (tasks) => {
+        this.blockedTasks.set(tasks);
+        this.blockedTasksLoading.set(false);
+      },
+      error: () => {
+        this.blockedTasks.set([]);
+        this.blockedTasksLoading.set(false);
+      },
+    });
+  }
+
+  closeBlockedTasks(): void {
+    this.blockedTasksOpen.set(false);
+  }
 
   readonly sortKey = signal<SortKey | null>('progress');
   readonly sortDir = signal<SortDir>('desc');
@@ -74,6 +100,7 @@ export class ProjectList {
   });
 
   open(id: string): void {
+    this.blockedTasksOpen.set(false);
     this.router.navigate(['/', id]);
   }
 }

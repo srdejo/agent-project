@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/projects")
 public class ProjectController {
@@ -27,6 +29,11 @@ public class ProjectController {
     @GetMapping("/{id}")
     public ProjectDetailResponse getById(@PathVariable("id") String id) {
         return queryService.getById(id);
+    }
+
+    @GetMapping("/blocked-tasks")
+    public List<BlockedTaskResponse> blockedTasks() {
+        return queryService.getBlockedTasks();
     }
 
     @ExceptionHandler(ProjectNotFoundException.class)

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { ProjectDetail, ProjectListResponse } from '../models/project';
+import { BlockedTask, ProjectDetail, ProjectListResponse } from '../models/project';
 
 @Injectable({ providedIn: 'root' })
 export class ProjectApiService {
@@ -13,5 +13,9 @@ export class ProjectApiService {
 
   get(id: string): Observable<ProjectDetail> {
     return this.http.get<ProjectDetail>(`/api/projects/${id}`);
+  }
+
+  blockedTasks(): Observable<BlockedTask[]> {
+    return this.http.get<BlockedTask[]>('/api/projects/blocked-tasks');
   }
 }

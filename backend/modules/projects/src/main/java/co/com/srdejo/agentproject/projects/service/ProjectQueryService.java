@@ -5,6 +5,7 @@ import co.com.srdejo.agentproject.projects.model.ProjectSnapshotEntity;
 import co.com.srdejo.agentproject.projects.repository.ProjectJpaRepository;
 import co.com.srdejo.agentproject.projects.repository.ProjectSnapshotJpaRepository;
 import co.com.srdejo.agentproject.projects.repository.SyncRunJpaRepository;
+import co.com.srdejo.agentproject.projects.web.BlockedTaskResponse;
 import co.com.srdejo.agentproject.projects.web.ProjectDetailResponse;
 import co.com.srdejo.agentproject.projects.web.ProjectListResponse;
 import co.com.srdejo.agentproject.projects.web.ProjectNotFoundException;
@@ -44,6 +45,14 @@ public class ProjectQueryService {
         String lastSync = syncRuns.findTopByOrderByRanAtDesc().map(run -> run.getRanAt().toString()).orElse(null);
 
         return new ProjectListResponse(summaries, new ProjectListResponse.Stats(count, avg, blocked, verified), lastSync);
+    }
+
+    public List<BlockedTaskResponse> getBlockedTasks() {
+        return projects.findAll().stream()
+                .flatMap(p -> p.getTasks().stream()
+                        .filter(t -> "blocked".equals(t.status()))
+                        .map(t -> new BlockedTaskResponse(p.getId(), p.getName(), t.name(), t.stage(), t.date())))
+                .toList();
     }
 
     public ProjectDetailResponse getById(String id) {

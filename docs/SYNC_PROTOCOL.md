@@ -57,6 +57,8 @@ ssh nolost-vps "mv /home/srdejo/agent-project/data/inbox/nuevo.json.tmp /home/sr
 
 Mapa cuya clave es el **id del proyecto** (ya no va como campo `id` adentro del objeto). Campos requeridos por entrada: `name`, `repo`, `progress` (0–100), `status`, `verify`, `last_modified`. El resto son opcionales — si faltan, se normalizan a `null` o lista vacía. `status` debe ser uno de `IN_PROGRESS | BLOCKED | STARTED | COMPLETED`; `verify` uno de `PASSED | ATTENTION | PENDING`. `last_modified` es un datetime ISO-8601 con offset (ej. `2026-08-19T18:00:00-05:00`).
 
+> ⚠️ **Dos campos `status` distintos, no confundirlos.** El `status` del proyecto (raíz del objeto) es el enum en **MAYÚSCULAS** `IN_PROGRESS|BLOCKED|STARTED|COMPLETED` y solo describe el estado general del proyecto en el detalle — **no alimenta ningún contador del listado**. El `status` de cada tarea (`tasks[].status`) es un enum aparte en **minúsculas** `done|wip|blocked|todo`, y es el único que suma al contador **"BLOCKED"** (y a "VERIFIED TASKS") del dashboard — ver `ProjectQueryService.countByStatus`, que compara el string tal cual, sin normalizar mayúsculas/minúsculas. Si el proyecto está bloqueado pero ninguna tarea tiene `"status": "blocked"`, el contador queda en 0 aunque `status: "BLOCKED"` esté puesto en la raíz. Y si por error se escribe `"BLOCKED"` (mayúscula) dentro de `tasks[]`, esa tarea se descarta por completo (ver [Reglas de validación](#reglas-de-validación-por-archivo)) y tampoco cuenta.
+
 ```json
 {
   "nolost": {
@@ -103,7 +105,7 @@ Mapa cuya clave es el **id del proyecto** (ya no va como campo `id` adentro del 
 | `verify` | enum | sí | `PASSED \| ATTENTION \| PENDING`. |
 | `summary` | string | no | Descripción del proyecto en 1–2 frases, para la sección "Qué es este proyecto" del detalle. |
 | `stack` | string[] | no | Tecnologías/stack del proyecto (tags en el detalle). |
-| `tasks` | `{name, stage, status, date, commit}[]` | no | Tareas individuales del roadmap. `status` uno de `done \| wip \| blocked \| todo` — **`done` solo si hay evidencia de verificación real, nunca porque se escribió código** (misma regla que `progress`, ver más abajo). Alimenta la tabla "Tareas desarrolladas" del detalle y los conteos de tareas/bloqueados/verificadas del listado. |
+| `tasks` | `{name, stage, status, date, commit}[]` | no | Tareas individuales del roadmap. `status` uno de `done \| wip \| blocked \| todo` (**minúsculas, distinto del `status` del proyecto**) — **`done` solo si hay evidencia de verificación real, nunca porque se escribió código** (misma regla que `progress`, ver más abajo). Es el campo que alimenta la tabla "Tareas desarrolladas" del detalle y los conteos de "BLOCKED"/"VERIFIED TASKS" del listado — el `status` del proyecto no cuenta para esas cifras. |
 | `checks` | `{name, ok, duration}[]` | no | Última corrida de verificación. |
 | `events` | `{time, mark, text}[]` | no | Feed de actividad reciente del agente. |
 
@@ -121,6 +123,14 @@ Una entrada con campos inválidos (falta un requerido, `status`/`verify` fuera d
 > No se actualiza el porcentaje porque el agente escribió código. Se actualiza cuando existe evidencia de avance (tarea del roadmap completa + verificación real). La misma regla aplica a `tasks[].status = "done"`: una tarea se marca `done` solo con evidencia real, nunca porque el código fue escrito.
 
 El backend no valida esto — es responsabilidad de quien genera el JSON (OpenClaw) no reportar `progress` ni `tasks[].status: "done"` sin evidencia real.
+
+## Regla de negocio: `blocked` también aplica por falta de definición, no solo por impedimento externo
+
+`tasks[].status = "blocked"` no es solo "algo externo me detuvo" (credenciales, API caída, dependencia de otro equipo). También aplica cuando, al leer el roadmap (`ROADMAP.md`/`TASKS.md`), la tarea **no tiene criterio de aceptación o alcance claro** para poder ejecutarla o verificarla — p. ej. un ítem del roadmap escrito de forma ambigua, sin definir qué significa "terminado" para esa tarea, o sin la validación/prueba que demuestre que se completó.
+
+> Si OpenClaw no puede determinar con qué evidencia verificar una tarea, esa tarea se marca `blocked` — nunca se infiere `done` "porque probablemente es lo que se quiso decir", ni se deja en `wip` indefinidamente sin señal de por qué no avanza.
+
+Esto es una extensión de la regla anterior (nunca inventar progreso): la ambigüedad en la definición de la tarea es, en sí misma, un bloqueador tan real como uno externo, y debe quedar visible en el dashboard igual que cualquier otro. Registrar la causa en `docs/PROGRESS.md`/`ROADMAP.md` del proyecto (sección "Bloqueadores") para que quede trazable de dónde viene.
 
 ## Fuera de alcance de este documento
 

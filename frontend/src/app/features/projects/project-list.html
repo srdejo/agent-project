@@ -9,10 +9,14 @@
         <div class="font-mono text-[10px] tracking-wider text-ink-muted mb-2">AVG PROGRESS</div>
         <div class="text-3xl font-semibold tracking-tight leading-none">{{ stats().avg }}%</div>
       </div>
-      <div class="bg-surface-card p-4">
+      <button
+        type="button"
+        (click)="openBlockedTasks()"
+        class="bg-surface-card p-4 text-left cursor-pointer transition-colors hover:bg-surface-divider"
+      >
         <div class="font-mono text-[10px] tracking-wider text-ink-muted mb-2">BLOCKED</div>
         <div class="text-3xl font-semibold tracking-tight leading-none text-status-warn">{{ stats().blocked }}</div>
-      </div>
+      </button>
       <div class="bg-surface-card p-4">
         <div class="font-mono text-[10px] tracking-wider text-ink-muted mb-2">VERIFIED TASKS</div>
         <div class="text-3xl font-semibold tracking-tight leading-none">{{ stats().verified }}</div>
@@ -106,3 +110,51 @@
     </div>
   </aside>
 </div>
+
+@if (blockedTasksOpen()) {
+  <div
+    class="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-[10vh]"
+    (click)="closeBlockedTasks()"
+  >
+    <div
+      class="w-full max-w-lg bg-surface-card border border-surface-border max-h-[70vh] flex flex-col"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="flex items-center justify-between px-5 py-4 border-b border-surface-border">
+        <h2 class="text-[13px] font-semibold tracking-wide">Blocked tasks</h2>
+        <button
+          type="button"
+          (click)="closeBlockedTasks()"
+          class="font-mono text-[11px] text-ink-subtle hover:text-ink transition-colors cursor-pointer"
+        >
+          CLOSE
+        </button>
+      </div>
+
+      <div class="overflow-y-auto">
+        @if (blockedTasksLoading()) {
+          <p class="px-5 py-6 text-[13px] text-ink-muted">Loading…</p>
+        } @else if (blockedTasks()?.length === 0) {
+          <p class="px-5 py-6 text-[13px] text-ink-muted">No blocked tasks.</p>
+        } @else {
+          @for (task of blockedTasks(); track task.projectId + task.taskName) {
+            <div
+              role="button"
+              tabindex="0"
+              (click)="open(task.projectId)"
+              (keydown.enter)="open(task.projectId)"
+              class="px-5 py-3.5 border-b border-surface-divider cursor-pointer transition-colors hover:bg-surface-divider"
+            >
+              <div class="text-[13px] font-medium tracking-tight">{{ task.taskName }}</div>
+              <div class="font-mono text-[10px] text-ink-muted mt-1">
+                {{ task.projectName }}
+                @if (task.stage) { · {{ task.stage }} }
+                @if (task.date) { · {{ task.date }} }
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  </div>
+}

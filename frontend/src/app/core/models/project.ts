@@ -54,6 +54,14 @@ export interface ProjectListResponse {
   lastSync: string | null;
 }
 
+export interface BlockedTask {
+  projectId: string;
+  projectName: string;
+  taskName: string;
+  stage: string;
+  date: string;
+}
+
 export interface ProjectDetail {
   id: string;
   name: string;
