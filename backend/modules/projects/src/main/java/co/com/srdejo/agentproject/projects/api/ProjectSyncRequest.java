@@ -6,6 +6,12 @@ import java.util.List;
 /**
  * Contract other modules use to apply an already-validated sync update onto a project.
  * Owned by {@code modules:projects} so this module never depends on {@code modules:parser}'s types.
+ *
+ * <p>{@code alias}, {@code priority}, {@code priorityRank} and {@code openQuestion} carry the
+ * optional editorial layer: {@code null} means "absent from the sync JSON" (keep the stored value),
+ * an empty string means "explicitly cleared". {@code priorityRank} is an {@code Integer}, so its
+ * "explicitly cleared" marker is {@code 0} instead of the empty string — a valid rank is 1 or
+ * greater, so {@code 0} can never be a real value.</p>
  */
 public record ProjectSyncRequest(
         String id,
@@ -18,6 +24,10 @@ public record ProjectSyncRequest(
         String commitSha,
         String verifyStatus,
         String summary,
+        String alias,
+        String priority,
+        Integer priorityRank,
+        String openQuestion,
         List<String> stack,
         List<Task> tasks,
         List<Check> checks,

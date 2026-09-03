@@ -1,13 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, effect, ElementRef, inject, ViewChild } from '@angular/core';
-import { RouterLink, RouterOutlet } from '@angular/router';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ProjectApiService } from './core/services/project-api.service';
 import { AgentMonitorService } from './core/services/agent-monitor.service';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterLink, RouterOutlet, DatePipe],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, DatePipe],
   templateUrl: './app.html',
 })
 export class App {

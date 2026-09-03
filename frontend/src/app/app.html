@@ -1,8 +1,14 @@
 <div class="min-h-screen">
   <header class="flex items-baseline justify-between gap-3 sm:gap-6 px-4 sm:px-6 md:px-10 py-4 sm:py-5 border-b border-surface-border">
     <div class="flex items-baseline gap-2 sm:gap-3.5 min-w-0">
-      <span class="text-[15px] sm:text-[17px] font-bold tracking-tight">OpenClaw</span>
+      <a routerLink="/" class="text-[15px] sm:text-[17px] font-bold tracking-tight hover:text-accent transition-colors">OpenClaw</a>
       <span class="text-[13px] sm:text-[17px] font-normal text-ink-muted truncate">Project Control Center</span>
+      <nav class="flex items-baseline gap-2.5 sm:gap-4 font-mono text-[10px] sm:text-[11px] uppercase tracking-wide ml-1 sm:ml-3">
+        <a routerLink="/" routerLinkActive="text-ink font-medium" [routerLinkActiveOptions]="{ exact: true }"
+           class="text-ink-muted hover:text-ink transition-colors">Mapa</a>
+        <a routerLink="/dashboard" routerLinkActive="text-ink font-medium"
+           class="text-ink-muted hover:text-ink transition-colors">Listado</a>
+      </nav>
     </div>
     <div class="flex items-center gap-3 sm:gap-5 font-mono text-[10px] sm:text-[11px] text-ink-muted flex-none">
       <a routerLink="/agent" class="flex items-center gap-1.5 hover:text-ink transition-colors" [title]="'View agent status: ' + monitor.status()" aria-label="View agent status">

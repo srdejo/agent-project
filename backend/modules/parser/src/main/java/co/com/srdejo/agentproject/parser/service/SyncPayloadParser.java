@@ -29,6 +29,11 @@ public class SyncPayloadParser {
     private static final Set<String> VALID_STATUSES = Set.of("IN_PROGRESS", "BLOCKED", "STARTED", "COMPLETED");
     private static final Set<String> VALID_VERIFY = Set.of("PASSED", "ATTENTION", "PENDING");
     private static final Set<String> VALID_TASK_STATUSES = Set.of("done", "wip", "blocked", "todo");
+    private static final Set<String> VALID_PRIORITIES = Set.of("NOW", "NEXT", "DECIDE", "ON_TRACK", "FROZEN");
+    private static final int ALIAS_MAX_LENGTH = 120;
+    private static final int MIN_PRIORITY_RANK = 1;
+    /** Value handed downstream to mean "clear the stored rank" — see {@link #optionalRank}. */
+    private static final int PRIORITY_RANK_CLEARED = 0;
 
     private final ObjectMapper objectMapper;
 
@@ -75,6 +80,16 @@ public class SyncPayloadParser {
             throw new SyncValidationException("Field 'progress' must be between 0 and 100, got " + progress);
         }
 
+        String alias = nullableText(node, "alias");
+        String priority = optionalEnum(node, "priority", VALID_PRIORITIES);
+        Integer priorityRank = optionalRank(node, "priority_rank");
+        String openQuestion = nullableText(node, "open_question");
+
+        if (alias != null && alias.length() > ALIAS_MAX_LENGTH) {
+            throw new SyncValidationException(
+                    "Field 'alias' must be at most " + ALIAS_MAX_LENGTH + " characters, got " + alias.length());
+        }
+
         return new SyncPayload(
                 id,
                 name,
@@ -86,6 +101,10 @@ public class SyncPayloadParser {
                 optionalText(node, "commit"),
                 verify,
                 optionalText(node, "summary"),
+                alias,
+                priority,
+                priorityRank,
+                openQuestion,
                 textList(node, "stack"),
                 taskList(node),
                 checkList(node),
@@ -130,6 +149,62 @@ public class SyncPayloadParser {
     private String optionalText(JsonNode node, String field) {
         JsonNode value = node.get(field);
         return (value == null || value.isNull()) ? null : value.asText();
+    }
+
+    /**
+     * Same shape as {@link #optionalText}, but it keeps the distinction the portfolio fields need:
+     * a field that is <em>absent</em> from the JSON comes back as {@code null} ("don't touch what is
+     * stored"), while a field present with an explicit {@code null} comes back as an empty string
+     * ("clear what is stored"). See docs/SYNC_PROTOCOL.md.
+     */
+    private String nullableText(JsonNode node, String field) {
+        if (!node.has(field)) {
+            return null;
+        }
+        JsonNode value = node.get(field);
+        return value.isNull() ? "" : value.asText();
+    }
+
+    /**
+     * Optional enum: absent -> {@code null}, explicit JSON {@code null} -> empty string (clear),
+     * present -> validated against {@code allowed}, rejecting the whole entry when it is not.
+     */
+    private String optionalEnum(JsonNode node, String field, Set<String> allowed) {
+        String value = nullableText(node, field);
+        if (value == null || value.isEmpty()) {
+            return value;
+        }
+        if (!allowed.contains(value)) {
+            throw new SyncValidationException("Field '" + field + "' must be one of " + allowed + ", got " + value);
+        }
+        return value;
+    }
+
+    /**
+     * Integer sibling of {@link #nullableText} for {@code priority_rank}: absent -> {@code null}
+     * ("don't touch what is stored"), explicit JSON {@code null} -> {@link #PRIORITY_RANK_CLEARED}
+     * ("clear what is stored"). The empty string is not an option for an {@code Integer}, so
+     * {@code 0} plays that role — it is outside the field's own domain, which starts at
+     * {@link #MIN_PRIORITY_RANK}. Anything present that is not an integer, or is below the minimum,
+     * rejects the whole entry the same way {@code progress} does.
+     */
+    private Integer optionalRank(JsonNode node, String field) {
+        if (!node.has(field)) {
+            return null;
+        }
+        JsonNode value = node.get(field);
+        if (value.isNull()) {
+            return PRIORITY_RANK_CLEARED;
+        }
+        if (!value.isIntegralNumber()) {
+            throw new SyncValidationException("Field '" + field + "' must be an integer, got " + value.asText());
+        }
+        int rank = value.asInt();
+        if (rank < MIN_PRIORITY_RANK) {
+            throw new SyncValidationException(
+                    "Field '" + field + "' must be " + MIN_PRIORITY_RANK + " or greater, got " + rank);
+        }
+        return rank;
     }
 
     private List<String> textList(JsonNode node, String field) {

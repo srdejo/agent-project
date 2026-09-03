@@ -55,6 +55,8 @@ public class ProjectSyncService implements ProjectSyncPort {
                 toTasks(request.tasks()),
                 toChecks(request.checks()),
                 toEvents(request.events()),
+                new ProjectEntity.Portfolio(request.alias(), request.priority(), request.priorityRank(),
+                        request.openQuestion()),
                 request.lastModified(),
                 now
         );

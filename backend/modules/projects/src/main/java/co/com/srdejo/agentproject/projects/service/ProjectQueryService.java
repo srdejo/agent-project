@@ -70,6 +70,10 @@ public class ProjectQueryService {
                 entity.getCommitSha(),
                 entity.getVerifyStatus(),
                 entity.getSummary(),
+                entity.getAlias(),
+                entity.getPriority(),
+                entity.getPriorityRank(),
+                entity.getOpenQuestion(),
                 entity.getStack(),
                 entity.getTasks().stream()
                         .map(t -> new ProjectDetailResponse.Task(t.name(), t.stage(), t.status(), t.date(), t.commit()))
@@ -103,6 +107,11 @@ public class ProjectQueryService {
                 entity.getStage(),
                 entity.getStatus(),
                 entity.getUpdatedLabel(),
+                entity.getSummary(),
+                entity.getAlias(),
+                entity.getPriority(),
+                entity.getPriorityRank(),
+                entity.getOpenQuestion(),
                 series,
                 tasksDone,
                 tasksTotal,

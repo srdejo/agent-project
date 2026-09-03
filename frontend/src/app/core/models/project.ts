@@ -2,6 +2,13 @@ export type ProjectStatus = 'IN_PROGRESS' | 'BLOCKED' | 'STARTED' | 'COMPLETED';
 export type VerificationStatus = 'PASSED' | 'ATTENTION' | 'PENDING';
 export type TaskStatus = 'done' | 'wip' | 'blocked' | 'todo';
 
+/**
+ * Capa editorial del portafolio: la decide el usuario, no se deriva de nada.
+ * Viaja en el JSON del inbox (`priority`) — ver docs/SYNC_PROTOCOL.md.
+ * `null` significa que el proyecto todavía no se ha clasificado.
+ */
+export type ProjectPriority = 'NOW' | 'NEXT' | 'DECIDE' | 'ON_TRACK' | 'FROZEN';
+
 export interface VerificationCheck {
   name: string;
   duration: string;
@@ -35,6 +42,12 @@ export interface ProjectSummary {
   stage: string;
   status: ProjectStatus;
   updated: string;
+  summary: string | null;
+  alias: string | null;
+  priority: ProjectPriority | null;
+  /** Posición en el orden del portafolio, 1 = primero. Distinto de `priority`, que es el grupo. */
+  priorityRank: number | null;
+  openQuestion: string | null;
   series: number[];
   tasksDone: number;
   tasksTotal: number;
@@ -73,6 +86,11 @@ export interface ProjectDetail {
   commit: string;
   verify: VerificationStatus;
   summary: string | null;
+  alias: string | null;
+  priority: ProjectPriority | null;
+  /** Posición en el orden del portafolio, 1 = primero. Distinto de `priority`, que es el grupo. */
+  priorityRank: number | null;
+  openQuestion: string | null;
   stack: string[];
   tasks: ProjectTask[];
   checks: VerificationCheck[];

@@ -55,7 +55,7 @@ ssh nolost-vps "mv /home/srdejo/agent-project/data/inbox/nuevo.json.tmp /home/sr
 
 ## Esquema JSON
 
-Mapa cuya clave es el **id del proyecto** (ya no va como campo `id` adentro del objeto). Campos requeridos por entrada: `name`, `repo`, `progress` (0–100), `status`, `verify`, `last_modified`. El resto son opcionales — si faltan, se normalizan a `null` o lista vacía. `status` debe ser uno de `IN_PROGRESS | BLOCKED | STARTED | COMPLETED`; `verify` uno de `PASSED | ATTENTION | PENDING`. `last_modified` es un datetime ISO-8601 con offset (ej. `2026-08-19T18:00:00-05:00`).
+Mapa cuya clave es el **id del proyecto** (ya no va como campo `id` adentro del objeto). Campos requeridos por entrada: `name`, `repo`, `progress` (0–100), `status`, `verify`, `last_modified`. El resto son opcionales — si faltan, se normalizan a `null` o lista vacía. `status` debe ser uno de `IN_PROGRESS | BLOCKED | STARTED | COMPLETED`; `verify` uno de `PASSED | ATTENTION | PENDING`. `last_modified` es un datetime ISO-8601 con offset (ej. `2026-08-19T18:00:00-05:00`). `priority`, si viene, debe ser uno de `NOW | NEXT | DECIDE | ON_TRACK | FROZEN`. `priority_rank`, si viene, debe ser un **entero mayor o igual a 1**: si no es un número entero (una cadena `"2"`, un decimal `2.5`, un booleano) o es menor que 1, la entrada se descarta.
 
 > ⚠️ **Dos campos `status` distintos, no confundirlos.** El `status` del proyecto (raíz del objeto) es el enum en **MAYÚSCULAS** `IN_PROGRESS|BLOCKED|STARTED|COMPLETED` y solo describe el estado general del proyecto en el detalle — **no alimenta ningún contador del listado**. El `status` de cada tarea (`tasks[].status`) es un enum aparte en **minúsculas** `done|wip|blocked|todo`, y es el único que suma al contador **"BLOCKED"** (y a "VERIFIED TASKS") del dashboard — ver `ProjectQueryService.countByStatus`, que compara el string tal cual, sin normalizar mayúsculas/minúsculas. Si el proyecto está bloqueado pero ninguna tarea tiene `"status": "blocked"`, el contador queda en 0 aunque `status: "BLOCKED"` esté puesto en la raíz. Y si por error se escribe `"BLOCKED"` (mayúscula) dentro de `tasks[]`, esa tarea se descarta por completo (ver [Reglas de validación](#reglas-de-validación-por-archivo)) y tampoco cuenta.
 
@@ -72,6 +72,10 @@ Mapa cuya clave es el **id del proyecto** (ya no va como campo `id` adentro del 
     "commit": "8413025",
     "verify": "PASSED",
     "summary": "Plataforma de gestión para la iglesia: consolidación de miembros, mentoreo y asistencia.",
+    "alias": "Mi Casa · Consolidación",
+    "priority": "NOW",
+    "priority_rank": 1,
+    "open_question": "¿Quién valida los datos de consolidación antes de migrarlos?",
     "stack": ["Node", "React", "PostgreSQL"],
     "tasks": [
       { "name": "Consolidación de miembros", "stage": "Fase 3", "status": "done", "date": "18 Ago", "commit": "8413025" },
@@ -104,6 +108,10 @@ Mapa cuya clave es el **id del proyecto** (ya no va como campo `id` adentro del 
 | `commit` | string | no | SHA corto del commit que originó este estado. |
 | `verify` | enum | sí | `PASSED \| ATTENTION \| PENDING`. |
 | `summary` | string | no | Descripción del proyecto en 1–2 frases, para la sección "Qué es este proyecto" del detalle. |
+| `alias` | string | no | Subtítulo corto del proyecto, máx. 120 caracteres (ej. `SCI 360 · Multimarcasa`). Capa editorial: **no se deriva de nada**, lo decide el usuario. Un alias más largo que 120 caracteres descarta la entrada. |
+| `priority` | enum | no | `NOW \| NEXT \| DECIDE \| ON_TRACK \| FROZEN`. Prioridad editorial del proyecto dentro del portafolio. Un valor fuera del enum descarta la entrada, igual que `status`/`verify`. |
+| `priority_rank` | int ≥ 1 | no | Posición del proyecto en el orden de prioridad del portafolio (`1` = el primero que se atiende). Capa editorial, igual que `priority`, pero responde otra pregunta: `priority` dice **en qué grupo de decisión está** el proyecto, `priority_rank` dice **en qué orden se atiende**. Un valor que no sea entero, o menor que 1, descarta la entrada. |
+| `open_question` | string | no | La única pregunta sin responder que desbloquea el proyecto. Texto libre largo, también editorial. |
 | `stack` | string[] | no | Tecnologías/stack del proyecto (tags en el detalle). |
 | `tasks` | `{name, stage, status, date, commit}[]` | no | Tareas individuales del roadmap. `status` uno de `done \| wip \| blocked \| todo` (**minúsculas, distinto del `status` del proyecto**) — **`done` solo si hay evidencia de verificación real, nunca porque se escribió código** (misma regla que `progress`, ver más abajo). Es el campo que alimenta la tabla "Tareas desarrolladas" del detalle y los conteos de "BLOCKED"/"VERIFIED TASKS" del listado — el `status` del proyecto no cuenta para esas cifras. |
 | `checks` | `{name, ok, duration}[]` | no | Última corrida de verificación. |
@@ -111,12 +119,42 @@ Mapa cuya clave es el **id del proyecto** (ya no va como campo `id` adentro del 
 
 `project_snapshots` (histórico) lo calcula el backend — no va en el JSON.
 
+## Capa editorial: `alias`, `priority`, `priority_rank`, `open_question`
+
+Estos cuatro campos son la **capa editorial** del portafolio: no se derivan del repo, del roadmap ni de Git — los decide el usuario. Los cuatro son opcionales y anulables, y por eso siguen una regla distinta a la del resto de campos:
+
+- **Si el campo no viene en el JSON** → se **conserva** el valor que ya tenía el proyecto en la base. Un `progreso.json` que no los traiga sigue siendo válido y no borra nada.
+- **Si el campo viene explícitamente como `null`** (o como cadena vacía) → se **limpia** el valor guardado.
+
+Es decir, "ausente" y "`null`" **no** significan lo mismo: omitir el campo es "no lo toques", mandarlo en `null` es "bórralo". El parser distingue ambos casos (`node.has(campo)` vs. `node.get(campo).isNull()`), así que para vaciar un alias hay que mandarlo explícitamente en `null`, no simplemente dejar de enviarlo.
+
+`priority` solo se valida contra el enum cuando viene presente y no es `null`; un valor fuera de `NOW | NEXT | DECIDE | ON_TRACK | FROZEN` descarta la entrada completa con warning, sin bloquear al resto del archivo.
+
+Los cuatro se exponen en el API como `alias`, `priority`, `priorityRank` y `openQuestion` (camelCase en la salida JSON, igual que `tasksDone`/`tasksTotal`), tanto en el listado (`GET /api/projects`) como en el detalle (`GET /api/projects/{id}`).
+
+### `priority` es el grupo, `priority_rank` es el orden
+
+Son dos campos distintos y **no se reemplazan entre sí**:
+
+- **`priority`** (`NOW | NEXT | DECIDE | ON_TRACK | FROZEN`) es el **grupo de decisión**: en qué estado está el proyecto dentro del portafolio (se está trabajando ahora, entra después, falta decidir algo, va en carril, está congelado).
+- **`priority_rank`** (entero ≥ 1) es la **posición en la fila**: en qué orden se atiende, siendo `1` el primero. Dos proyectos pueden compartir grupo (`NOW` los dos) y aun así tener un orden claro entre ellos (`1` y `2`).
+
+El backend **no** valida que los rangos sean únicos ni consecutivos, ni que sean coherentes con el grupo — eso corre por cuenta de quien genera el JSON. Lo único que valida es que, si el campo viene, sea un entero ≥ 1.
+
+### Cómo se limpia un `priority_rank`
+
+`alias`, `priority` y `open_question` son cadenas, así que "vacío" (`""`) alcanza como marca interna de "límpialo". `priority_rank` es un entero y no tiene cadena vacía, así que usa **`0`** como esa misma marca: un valor fuera de su propio dominio, ya que un rango válido siempre arranca en `1`. Esto es interno del backend — desde el JSON la regla es la misma que para los otros tres:
+
+- `priority_rank` **ausente** → se conserva el rango guardado.
+- `"priority_rank": null` → se **borra** el rango guardado.
+- `"priority_rank": 0` (o negativo) → **descarta la entrada** con warning. Para borrar el rango hay que mandar `null`, no `0`.
+
 ## Reglas de validación por archivo
 
 - **`progreso.json`**: cada clave debe ser un id **ya existente**. Si no existe, esa entrada se descarta (log de warning) — no crea proyectos. Si existe: se compara `last_modified` recibido contra el guardado; igual → no se toca la base; distinto → se aplica el update y se guarda una nueva fila en `project_snapshots`.
 - **`nuevo.json`**: cada clave debe ser un id que **no existe todavía**. Si ya existe, esa entrada se descarta (log de warning) — no pisa proyectos existentes vía este archivo. Si no existe, se crea.
 
-Una entrada con campos inválidos (falta un requerido, `status`/`verify` fuera del enum, `progress` fuera de 0–100, `last_modified` no parseable, o algún `tasks[].status` fuera de `done|wip|blocked|todo`) también se descarta con warning — no bloquea al resto de las entradas del archivo.
+Una entrada con campos inválidos (falta un requerido, `status`/`verify`/`priority` fuera del enum, `progress` fuera de 0–100, `priority_rank` que no sea entero o sea menor que 1, `alias` de más de 120 caracteres, `last_modified` no parseable, o algún `tasks[].status` fuera de `done|wip|blocked|todo`) también se descarta con warning — no bloquea al resto de las entradas del archivo.
 
 ## Regla de negocio: nunca inventar progreso
 

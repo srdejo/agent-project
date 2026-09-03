@@ -60,6 +60,10 @@ class ProjectSyncServiceTest {
         assertThat(saved.getId()).isEqualTo("agent-project");
         assertThat(saved.getName()).isEqualTo("Agent Project");
         assertThat(saved.getProgress()).isEqualTo(42);
+        assertThat(saved.getAlias()).isEqualTo("SCI 360 \u00b7 Multimarcasa");
+        assertThat(saved.getPriority()).isEqualTo("NOW");
+        assertThat(saved.getPriorityRank()).isEqualTo(1);
+        assertThat(saved.getOpenQuestion()).isEqualTo("\u00bfQui\u00e9n paga la primera licencia?");
 
         verify(snapshots).save(any(ProjectSnapshotEntity.class));
     }
@@ -69,6 +73,7 @@ class ProjectSyncServiceTest {
         ProjectEntity existing = ProjectEntity.create("agent-project", Instant.parse("2026-08-18T00:00:00Z"));
         existing.applySync("Old name", "repo", "stage", "STARTED", 10, "updated", "sha", "PENDING",
                 "summary", List.of(), List.of(), List.of(), List.of(),
+                new ProjectEntity.Portfolio("Old alias", "FROZEN", 7, "Old question"),
                 Instant.parse("2026-08-18T10:00:00Z"), Instant.parse("2026-08-18T00:00:00Z"));
         when(projects.findById("agent-project")).thenReturn(Optional.of(existing));
 
@@ -89,6 +94,7 @@ class ProjectSyncServiceTest {
         ProjectEntity existing = ProjectEntity.create("agent-project", Instant.parse("2026-08-18T00:00:00Z"));
         existing.applySync("Agent Project", "repo", "stage", "IN_PROGRESS", 42, "updated", "sha", "PASSED",
                 "summary", List.of(), List.of(), List.of(), List.of(),
+                new ProjectEntity.Portfolio("SCI 360", "NOW", 1, "question"),
                 sameInstant, Instant.parse("2026-08-18T00:00:00Z"));
         when(projects.findById("agent-project")).thenReturn(Optional.of(existing));
 
@@ -101,7 +107,65 @@ class ProjectSyncServiceTest {
         verify(snapshots, never()).save(any());
     }
 
+    @Test
+    void appliesThePortfolioFieldsWhenTheyComeInTheRequest() {
+        ProjectEntity existing = ProjectEntity.create("agent-project", Instant.parse("2026-08-18T00:00:00Z"));
+        existing.applySync("Old name", "repo", "stage", "STARTED", 10, "updated", "sha", "PENDING",
+                "summary", List.of(), List.of(), List.of(), List.of(),
+                new ProjectEntity.Portfolio("Old alias", "FROZEN", 7, "Old question"),
+                Instant.parse("2026-08-18T10:00:00Z"), Instant.parse("2026-08-18T00:00:00Z"));
+        when(projects.findById("agent-project")).thenReturn(Optional.of(existing));
+
+        service.applySync(request(Instant.parse("2026-08-19T10:00:00Z"), "New alias", "DECIDE", 3, "New question"));
+
+        assertThat(existing.getAlias()).isEqualTo("New alias");
+        assertThat(existing.getPriority()).isEqualTo("DECIDE");
+        assertThat(existing.getPriorityRank()).isEqualTo(3);
+        assertThat(existing.getOpenQuestion()).isEqualTo("New question");
+    }
+
+    @Test
+    void keepsTheStoredPortfolioFieldsWhenTheRequestDoesNotCarryThem() {
+        ProjectEntity existing = ProjectEntity.create("agent-project", Instant.parse("2026-08-18T00:00:00Z"));
+        existing.applySync("Old name", "repo", "stage", "STARTED", 10, "updated", "sha", "PENDING",
+                "summary", List.of(), List.of(), List.of(), List.of(),
+                new ProjectEntity.Portfolio("Old alias", "FROZEN", 7, "Old question"),
+                Instant.parse("2026-08-18T10:00:00Z"), Instant.parse("2026-08-18T00:00:00Z"));
+        when(projects.findById("agent-project")).thenReturn(Optional.of(existing));
+
+        service.applySync(request(Instant.parse("2026-08-19T10:00:00Z"), null, null, null, null));
+
+        assertThat(existing.getName()).isEqualTo("Agent Project");
+        assertThat(existing.getAlias()).isEqualTo("Old alias");
+        assertThat(existing.getPriority()).isEqualTo("FROZEN");
+        assertThat(existing.getPriorityRank()).isEqualTo(7);
+        assertThat(existing.getOpenQuestion()).isEqualTo("Old question");
+    }
+
+    @Test
+    void clearsThePortfolioFieldsWhenTheRequestCarriesThemAsExplicitlyEmpty() {
+        ProjectEntity existing = ProjectEntity.create("agent-project", Instant.parse("2026-08-18T00:00:00Z"));
+        existing.applySync("Old name", "repo", "stage", "STARTED", 10, "updated", "sha", "PENDING",
+                "summary", List.of(), List.of(), List.of(), List.of(),
+                new ProjectEntity.Portfolio("Old alias", "FROZEN", 7, "Old question"),
+                Instant.parse("2026-08-18T10:00:00Z"), Instant.parse("2026-08-18T00:00:00Z"));
+        when(projects.findById("agent-project")).thenReturn(Optional.of(existing));
+
+        service.applySync(request(Instant.parse("2026-08-19T10:00:00Z"), "", "",
+                ProjectEntity.PORTFOLIO_RANK_CLEARED, ""));
+
+        assertThat(existing.getAlias()).isNull();
+        assertThat(existing.getPriority()).isNull();
+        assertThat(existing.getPriorityRank()).isNull();
+        assertThat(existing.getOpenQuestion()).isNull();
+    }
+
     private ProjectSyncRequest request(Instant lastModified) {
+        return request(lastModified, "SCI 360 \u00b7 Multimarcasa", "NOW", 1, "\u00bfQui\u00e9n paga la primera licencia?");
+    }
+
+    private ProjectSyncRequest request(Instant lastModified, String alias, String priority, Integer priorityRank,
+                                        String openQuestion) {
         return new ProjectSyncRequest(
                 "agent-project",
                 "Agent Project",
@@ -113,6 +177,10 @@ class ProjectSyncServiceTest {
                 "abc123",
                 "PASSED",
                 "on track",
+                alias,
+                priority,
+                priorityRank,
+                openQuestion,
                 List.of("java", "angular"),
                 List.of(new ProjectSyncRequest.Task("sync job", "backend", "done", "2026-08-19", "abc123")),
                 List.of(new ProjectSyncRequest.Check("unit tests", true, "12s")),

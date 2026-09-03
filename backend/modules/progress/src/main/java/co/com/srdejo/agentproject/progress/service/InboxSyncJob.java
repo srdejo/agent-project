@@ -254,6 +254,10 @@ public class InboxSyncJob {
                 payload.commit(),
                 payload.verify(),
                 payload.summary(),
+                payload.alias(),
+                payload.priority(),
+                payload.priorityRank(),
+                payload.openQuestion(),
                 payload.stack(),
                 payload.tasks().stream()
                         .map(t -> new ProjectSyncRequest.Task(t.name(), t.stage(), t.status(), t.date(), t.commit()))

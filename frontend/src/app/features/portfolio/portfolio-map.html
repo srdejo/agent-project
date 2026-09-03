@@ -1,0 +1,208 @@
+<section class="px-4 sm:px-6 md:px-10 pt-8 pb-16 min-h-[80vh]">
+
+  <!-- Encabezado -->
+  <div class="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 pb-6 border-b border-surface-border">
+    <div class="max-w-[62ch]">
+      <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight leading-none">Mapa del portafolio</h1>
+      <p class="text-[13px] text-ink-muted mt-2.5 leading-relaxed">
+        Los proyectos en el orden en que se atienden, no por su número. El avance sale de las
+        tareas — <span class="font-mono text-[12px]">done / total</span> — y una tarea solo cuenta
+        como hecha con evidencia de verificación real.
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-x-6 gap-y-2 font-mono text-[11px] text-ink-muted">
+      <span><span class="text-ink font-medium">{{ totals().projects }}</span> proyectos</span>
+      <span><span class="text-ink font-medium">{{ totals().tasks }}</span> tareas</span>
+      <span><span class="text-ink font-medium">{{ totals().done }}</span> verificadas ({{ totals().pct }}%)</span>
+      <span><span class="text-status-warn font-medium">{{ totals().blocked }}</span> bloqueadas</span>
+      <a routerLink="/dashboard" class="underline underline-offset-4 hover:text-ink transition-colors">
+        Ver listado ordenable →
+      </a>
+    </div>
+  </div>
+
+  @if (!loaded()) {
+    <p class="font-mono text-[12px] text-ink-muted py-10">Cargando el portafolio…</p>
+  }
+
+  @if (sinClasificar() > 0) {
+    <p class="font-mono text-[11px] text-status-warn border border-surface-border bg-surface-card px-4 py-3 mt-6">
+      {{ sinClasificar() }} proyecto(s) sin posición asignada, al final de la lista. Se ordenan con
+      <span class="font-medium">priority_rank</span> en progreso.json.
+    </p>
+  }
+
+  <!-- La lista, en orden de prioridad -->
+  <div class="mt-8 border-t border-surface-border">
+    @for (row of rows(); track row.project.id) {
+      <button
+        type="button"
+        (click)="open(row.project.id)"
+        class="w-full text-left grid grid-cols-[auto_minmax(0,1fr)] md:grid-cols-[auto_minmax(0,1fr)_minmax(0,290px)] gap-x-5 md:gap-x-8 gap-y-3 py-5 px-2 border-b border-surface-border cursor-pointer transition-colors hover:bg-surface-card">
+
+        <!-- Posicion -->
+        <span class="font-mono text-[20px] font-semibold tabular-nums text-ink-faint leading-none pt-0.5 w-8">
+          {{ row.rank ?? '—' }}
+        </span>
+
+        <!-- Identidad y proposito -->
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+            <span class="text-[15px] font-semibold tracking-tight">{{ row.project.name }}</span>
+            @if (row.project.alias) {
+              <span class="text-[12px] text-ink-muted truncate">{{ row.project.alias }}</span>
+            }
+            <span class="font-mono text-[10px] uppercase tracking-wide px-1.5 py-0.5" [class]="row.grupo.clase">
+              {{ row.grupo.label }}
+            </span>
+          </div>
+
+          @if (row.project.summary) {
+            <p class="text-[13px] text-ink-muted mt-1.5 leading-relaxed line-clamp-2">{{ row.project.summary }}</p>
+          }
+
+          @if (row.project.stage) {
+            <p class="font-mono text-[11px] text-ink-subtle mt-2 truncate" [title]="row.project.stage">
+              {{ row.project.stage }}
+            </p>
+          }
+
+          @if (row.project.openQuestion) {
+            <p class="text-[12px] mt-2.5 pl-3 border-l-2 border-status-warn text-ink leading-relaxed">
+              <span class="font-mono text-[10px] uppercase tracking-wide text-status-warn block mb-0.5">Falta responder</span>
+              {{ row.project.openQuestion }}
+            </p>
+          }
+        </div>
+
+        <!-- Avance -->
+        <div class="col-start-2 md:col-start-3 flex flex-col gap-2 justify-start">
+          <div class="flex items-baseline justify-between gap-3">
+            <span class="font-mono text-[11px] text-ink-muted">
+              {{ row.project.tasksDone }}/{{ row.project.tasksTotal }} verificadas
+            </span>
+            <span class="text-[15px] font-semibold tabular-nums leading-none">{{ row.project.progress }}%</span>
+          </div>
+
+          <div class="flex h-1.5 w-full bg-surface-divider overflow-hidden"
+               role="img"
+               [attr.aria-label]="row.project.tasksDone + ' de ' + row.project.tasksTotal + ' tareas verificadas'">
+            <span class="h-full bg-status-ok" [style.width.%]="row.donePct"></span>
+            <span class="h-full bg-status-warn" [style.width.%]="row.blockedPct"></span>
+            <span class="h-full bg-ink-faint" [style.width.%]="row.restPct"></span>
+          </div>
+
+          @if (row.blocked > 0) {
+            <div class="mt-0.5">
+              <span class="font-mono text-[10px] uppercase tracking-wide text-status-warn">
+                {{ row.blocked }} bloqueada(s)
+              </span>
+              <ul class="mt-1 space-y-0.5">
+                @for (name of row.blockedNames.slice(0, 3); track name) {
+                  <li class="text-[11.5px] text-ink-muted leading-snug">· {{ name }}</li>
+                }
+                @if (row.blockedNames.length > 3) {
+                  <li class="font-mono text-[10.5px] text-ink-subtle">+ {{ row.blockedNames.length - 3 }} más</li>
+                }
+              </ul>
+            </div>
+          } @else {
+            <span class="font-mono text-[10px] uppercase tracking-wide text-ink-subtle">Sin bloqueos</span>
+          }
+        </div>
+      </button>
+    }
+  </div>
+
+  <!-- Preguntas abiertas -->
+  @if (questions().length > 0) {
+    <div class="mt-14">
+      <h2 class="text-[13px] font-semibold tracking-wide">Preguntas que desbloquean</h2>
+      <p class="font-mono text-[11px] text-ink-muted mt-1 mb-4">
+        Ordenadas por cuántas tareas libera cada una. Se responden decidiendo, no programando.
+      </p>
+
+      <ol class="border-t border-surface-border">
+        @for (q of questions(); track q.projectId) {
+          <li class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-baseline gap-x-4 py-4 px-2 border-b border-surface-border">
+            <span class="font-mono text-[11px] text-ink-subtle tabular-nums">{{ $index + 1 }}</span>
+            <div class="min-w-0">
+              <p class="text-[14px] leading-snug">{{ q.question }}</p>
+              <button type="button" (click)="open(q.projectId)"
+                      class="font-mono text-[11px] text-ink-muted mt-1 hover:text-ink transition-colors underline underline-offset-4">
+                {{ q.projectName }}
+              </button>
+            </div>
+            @if (q.blocked > 0) {
+              <span class="font-mono text-[11px] text-status-warn whitespace-nowrap tabular-nums">{{ q.blocked }} tarea(s)</span>
+            } @else {
+              <span class="font-mono text-[11px] text-ink-faint whitespace-nowrap">—</span>
+            }
+          </li>
+        }
+      </ol>
+    </div>
+  }
+
+  <!--
+    Hallazgos transversales: no salen del API porque no son derivables de ningun
+    proyecto por separado — solo se ven mirando los diez juntos. Se mantienen aqui
+    a mano y cambian pocas veces.
+  -->
+  <div class="mt-14">
+    <h2 class="text-[13px] font-semibold tracking-wide">Lo que solo se ve mirando todos juntos</h2>
+    <p class="font-mono text-[11px] text-ink-muted mt-1 mb-4">
+      Ningún PROGRESS.md puede decir esto, porque cada uno solo se ve a sí mismo.
+    </p>
+
+    <div class="grid gap-px bg-surface-border border border-surface-border sm:grid-cols-2">
+      <div class="bg-surface-card p-5 flex flex-col gap-2">
+        <span class="font-mono text-[10px] uppercase tracking-wide text-ink-subtle">Bloqueos</span>
+        <h3 class="text-[14px] font-semibold tracking-tight">Casi nada está bloqueado por algo técnico</h3>
+        <p class="text-[13px] text-ink-muted leading-relaxed">
+          La gran mayoría de las tareas bloqueadas espera una decisión, no una solución. Las de
+          <span class="font-medium text-ink">subscription-hub</span> son la misma pregunta seis veces:
+          qué proveedor de pagos. Las de <span class="font-medium text-ink">consulting</span> dependen
+          de un solo texto: el prompt de revisión.
+        </p>
+      </div>
+
+      <div class="bg-surface-card p-5 flex flex-col gap-2">
+        <span class="font-mono text-[10px] uppercase tracking-wide text-ink-subtle">Diseño</span>
+        <h3 class="text-[14px] font-semibold tracking-tight">El Design System está vacío y nadie lo usa</h3>
+        <p class="text-[13px] text-ink-muted leading-relaxed">
+          Hay cinco proyectos de Claude Design, uno por producto, cada uno con su paleta. El único de
+          tipo <i>design system</i> — el que podría compartirse — existe desde junio sin un solo
+          archivo, mientras cinco frontends Angular con Tailwind repiten las mismas decisiones.
+        </p>
+      </div>
+
+      <div class="bg-surface-card p-5 flex flex-col gap-2">
+        <span class="font-mono text-[10px] uppercase tracking-wide text-ink-subtle">Higiene</span>
+        <h3 class="text-[14px] font-semibold tracking-tight">Los archivos "sin commitear" casi no son trabajo</h3>
+        <p class="text-[13px] text-ink-muted leading-relaxed">
+          Los repos muestran más de cien cambios pendientes, pero la mayoría son
+          <span class="font-mono text-[12px]">LICENSE</span>,
+          <span class="font-mono text-[12px]">.editorconfig</span> y
+          <span class="font-mono text-[12px]">.prettierrc</span> reescritos enteros sin cambiar una
+          palabra: ruido de fin de línea CRLF/LF. Hay trabajo real mezclado dentro — conviene separarlo
+          antes de que un checkout se lleve algo por delante.
+        </p>
+      </div>
+
+      <div class="bg-surface-card p-5 flex flex-col gap-2">
+        <span class="font-mono text-[10px] uppercase tracking-wide text-ink-subtle">Datos</span>
+        <h3 class="text-[14px] font-semibold tracking-tight">El CSV de SCI 360 no es un libro de ventas</h3>
+        <p class="text-[13px] text-ink-muted leading-relaxed">
+          Sus 28 columnas no traen fecha ni número de factura: es un agregado por periodo, una fila por
+          cliente y producto. Por eso ninguna clave de negocio puede hacer única a una venta, y la
+          deduplicación al re-subir un archivo solo se resuelve con un hash del contenido.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <p class="font-mono text-[10px] text-ink-subtle mt-12 uppercase tracking-wide">
+    Fuente: /api/projects · prioridad, orden y preguntas vienen del sync (progreso.json)
+  </p>
+</section>
