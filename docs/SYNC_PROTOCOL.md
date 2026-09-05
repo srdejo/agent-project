@@ -173,3 +173,5 @@ Esto es una extensión de la regla anterior (nunca inventar progreso): la ambig�
 ## Fuera de alcance de este documento
 
 Cómo OpenClaw lee `ROADMAP.md`/`PROGRESS.md`/`TASKS.md` y el estado de Git de cada proyecto para construir `progreso.json`/`nuevo.json`, y cómo se programa su envío periódico, corre por cuenta del usuario en su propia máquina — este documento solo define el contrato que el backend espera recibir.
+
+La implementación que hoy cumple ese rol vive en `infra/portfolio/` (raíz del workspace): un script determinista que deriva el estado de los `docs/ROADMAP.md`, no un agente. Su rúbrica de parseo está documentada en `infra/portfolio/README.md`.

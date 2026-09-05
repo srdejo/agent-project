@@ -21,14 +21,14 @@ Checkboxes `[x]` solo se marcan cuando la tarea fue **verificada en el código**
 
 - [x] Documentar el esquema JSON en `docs/SYNC_PROTOCOL.md` (rediseñado 2026-08-19: `progreso.json`/`nuevo.json` agregados por id, en vez de un archivo por proyecto — ver `docs/DECISIONS.md`).
 - [x] `SyncPayloadParser.parseBatch` (`modules:parser`) — valida campos requeridos, enums, `last_modified`, normaliza opcionales; una entrada inválida no bloquea al resto del archivo.
-- [ ] Pruebas unitarias de `SyncPayloadParser.parseBatch` contra payloads de ejemplo (válidos e inválidos, batch mixto).
+- [x] Pruebas unitarias de `SyncPayloadParser.parseBatch` contra payloads de ejemplo (válidos e inválidos, batch mixto).
 
 ## Etapa 2 — Store de proyectos (Postgres + JPA) 🟢
 
 - [x] Esquema Flyway (`projects`, `project_snapshots`).
 - [x] `ProjectEntity`/`ProjectSnapshotEntity` + `ProjectJpaRepository`/`ProjectSnapshotJpaRepository`.
 - [x] `ProjectSyncService` (upsert, crea el proyecto si no existía; dedupe por `source_last_modified` en vez de hash SHA-256 desde el rediseño del protocolo).
-- [ ] Pruebas unitarias/`@DataJpaTest` de `ProjectSyncService` (creación, actualización, no-op si `last_modified` no cambió).
+- [x] Pruebas unitarias/`@DataJpaTest` de `ProjectSyncService` (creación, actualización, no-op si `last_modified` no cambió).
 
 ## Etapa 3 — API de progreso 🟢
 
