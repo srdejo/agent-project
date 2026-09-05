@@ -53,6 +53,10 @@ Definir con el usuario qué sigue: nuevas features del dashboard, mejoras al syn
 - **Pruebas unitarias verificadas** (Etapas 1 y 2, 2026-08-19): `SyncPayloadParserTest` (8 tests) y `ProjectSyncServiceTest` (4 tests) — escritas en commit `725261a`, corridas con `./gradlew :modules:parser:test :modules:projects:test` en verde (BUILD SUCCESSFUL in 8s). Cubren: parsing de entry válida completa, normalización de opcionales ausentes, rechazo de entry sin campo requerido sin bloquear las demás, `progress` fuera de rango, `status` inválido, `tasks[].status` inválido, `last_modified` no ISO-8601, JSON raíz no-objeto, JSON inválido (parser); creación, actualización por `last_modified` distinto, no-op por `last_modified` igual, `exists()` (service).
 - **Sync automático vía OpenClaw** configurado y en producción: barre `docs/` de los 9 proyectos, genera `progreso.json`/`nuevo.json`, los sube al inbox del VPS sin reiniciar el servicio. Corre a las 8am/12pm/6pm y bajo demanda.
 
+## Completado (adicion 2026-09-05)
+
+- **Observabilidad HTTP** (`platform:web-common`, paquete `logging`): `RequestLoggingFilter` (1 linea por request con status/duracion, INFO/WARN/ERROR segun status) + `requestId` en MDC via `logging.pattern.level`. Objetivo: que `journalctl -u agent-project.service -f` deje de estar vacio en produccion. **No verificado por compilacion** — sesion sin red, no se pudo correr `./gradlew`; revisado a mano (imports, paquete, dependencias del modulo). Sin `@RestControllerAdvice` global ni modulo `platform:security` en este proyecto todavia, asi que no se tocaron esas piezas — ver `docs/DECISIONS.md`.
+
 ## Bloqueadores
 
 Ninguno.

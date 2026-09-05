@@ -44,6 +44,9 @@ Consecuencias de diseño:
 ### Deploy real a `nolost-vps`: puerto 8083, subdominio `agent.srdejo.com.co`
 Pedido explícito del usuario ("continua y si hay acceso al servidor"). `nolost` ya ocupa el puerto 8080 del mismo VPS, así que se relevaron los puertos en uso (`PORTS.md`, nuevo, en la raíz del workspace — se actualiza cada vez que se despliega un servicio) y se eligió 8083 (8081 está reservado para `hotel`, sin usar todavía). El usuario creó el registro DNS y corrió los pasos que requerían `sudo` (crear la base de datos, instalar el `systemd` unit, mover el config de nginx, `certbot`) — esta sesión no tiene sudo en el VPS, solo el usuario `srdejo` sin privilegios.
 
+### Observabilidad HTTP: filtro de log + requestId en MDC, sin advice global todavia
+El servicio corre bajo systemd y `journalctl -u agent-project.service -f` no mostraba nada en tiempo de ejecucion. Se agrego `platform:webcommon.logging` (`RequestLoggingFilter` + `RequestLoggingConfig`, `Ordered.HIGHEST_PRECEDENCE`) siguiendo la implementacion de referencia de `distriapp`, con una linea por request (metodo, path, status, duracion) y `requestId` en el MDC (`logging.pattern.level` en `application.yml`). No hay `usr=` en el patron ni `JwtAuthenticationFilter` que alimente un userId: `agent-project` sigue sin modulo `platform:security` (ver decision de arriba). Tampoco existe un `@RestControllerAdvice` global todavia, asi que las respuestas de error de `ProjectController` no dejan una linea de log propia — pendiente cuando se decida el manejo de errores de la API.
+
 ## Frontend
 
 ### Angular 22 standalone + Tailwind, sin librería de componentes
