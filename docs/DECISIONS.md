@@ -65,3 +65,13 @@ La decisión original (`ROADMAP.md` Etapa 1) era que este módulo leyera `ROADMA
 
 ### `modules:projects` no depende de `modules:parser`
 Para no acoplar el módulo de persistencia al formato de entrada del sync, `modules:projects` expone su propio contrato (`api/ProjectSyncRequest`, `api/ProjectSyncPort`) en vez de depender del `SyncPayload` de `modules:parser`. Es `modules:progress` quien conoce ambos módulos y mapea de uno a otro en `InboxSyncJob`.
+
+## Los `git push` los hace Daniel, no el agente (2026-09-08)
+
+Las sesiones del agente trabajan en una rama `claude/<tema>-<fecha>` y hacen commit local, pero **no publican nada**: el `push` y el merge a `main` los hace Daniel desde su máquina, y en el entorno del agente no se configuran credenciales de git (ni deploy key, ni token, ni llaves SSH).
+
+El motivo es doble. El entorno del agente es efímero —cada sesión arranca con un `$HOME` limpio—, así que cualquier credencial tendría que quedar en texto plano dentro de la carpeta del workspace para sobrevivir de un día para otro; y el push manual conserva un punto de revisión humano, porque el diff se ve antes de que entre a GitHub. Automatizarlo ahorra ~30 segundos al día a cambio de un secreto en disco, y el cambio no compensa.
+
+Alternativas descartadas: una **deploy key por repo** (son 10 y una llave sirve para un solo repositorio; además no se puede limitar a un patrón de ramas — eso lo hace un *ruleset*, no el tipo de credencial); un **token fino** con `Contents: Read and write` sobre los 10 repos (más simple que 10 llaves y sería la vía si algún día se automatiza, pero deja el token en disco y exigiría proteger `main` con un ruleset); y una **GitHub App** (lo más correcto, demasiado montaje para lo que se gana).
+
+Consecuencia práctica: que `git push` falle en el entorno del agente con `Host key verification failed` es el **comportamiento esperado**, no un problema por resolver ni un bloqueante que reportar. Cada sesión deja las ramas listas y los comandos de push en `RESUMEN-DIARIO.md`, en la raíz del workspace. Aplica a los 10 repos.
