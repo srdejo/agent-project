@@ -18,7 +18,7 @@ Cómo está desplegado `agent-project` en `nolost-vps`. **Desplegado y verificad
 
 ## Puerto
 
-Backend en **`127.0.0.1:8083`** (loopback, nginx hace proxy) — `nolost` ya ocupa 8080 en el mismo servidor. Ver `PORTS.md` en la raíz del workspace para el mapa completo de puertos del VPS; actualizarlo cada vez que se despliega un servicio nuevo.
+Backend en **`127.0.0.1:8083`** (loopback, nginx hace proxy) — `nolost` ya ocupa 8080 en el mismo servidor. Ver `infra/PORTS.md` del workspace para el mapa completo de puertos del VPS; actualizarlo cada vez que se despliega un servicio nuevo.
 
 ## Estructura de directorios
 
