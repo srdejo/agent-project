@@ -1,6 +1,0 @@
-dependencies {
-    implementation project(':platform:web-common')
-    implementation project(':modules:projects')
-    implementation project(':modules:parser')
-    implementation rootProject.libs.spring.boot.starter.web
-}

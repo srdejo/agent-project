@@ -1,0 +1,56 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: agent-project-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  r2dbc:
+    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:agent_project}
+    username: ${DB_USER:agent_project}
+    password: ${DB_PASSWORD:agent_project}
+    # El Postgres del VPS lo comparten ~13 apps con max_connections=100: mismo limite que antes con Hikari.
+    pool:
+      max-size: ${DB_POOL_MAX:5}
+      initial-size: ${DB_POOL_MIN_IDLE:1}
+  flyway:
+    # Flyway no corre sobre R2DBC: usa su propia conexion JDBC, fuera del pool de la app.
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:agent_project}
+    user: ${DB_USER:agent_project}
+    password: ${DB_PASSWORD:agent_project}
+    locations: classpath:db/migration
+
+logging:
+  pattern:
+    level: "%5p [req=%X{requestId:--}]"
+
+agent-project:
+  sync:
+    inbox-dir: ${SYNC_INBOX_DIR:./data/inbox}
+    stale-after: ${SYNC_STALE_AFTER:PT26H}
+  agent:
+    token: ${AGENT_WS_TOKEN:}
+
+appDescription: "Agent Project — Project Control Center"
+appVersion: "2.0.0"
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+
+logging:
+  level:
+    co.com.srdejo.agentproject: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+logging:
+  level:
+    co.com.srdejo.agentproject: INFO

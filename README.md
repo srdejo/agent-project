@@ -2437,6 +2437,31 @@ Establece las instrucciones operativas, límites y protocolos que **deben seguir
 
 ---
 
+### 🎯 Objetivo del proyecto (dentro de `ROADMAP.md`)
+El avance de un proyecto se mide **contra un objetivo declarado**, no contra la suma de todo el roadmap. Responde a la pregunta: ***¿Qué estamos intentando lograr ahora, y cuánto falta?***
+
+```markdown
+## Objetivo actual: MVP en producción
+
+**Criterio de cierre**: un usuario real crea una orden y paga desde producción.
+**Alcance**: Fase 2, Fase 3, openspec:integrar-pagos
+**Fecha objetivo**: 2026-11-30
+
+## Objetivos cumplidos
+- 2026-09-04 — Fundación: el proyecto compila, arranca y tiene CI.
+```
+
+Reglas:
+- `## Objetivo actual: <nombre>` es un encabezado de nivel 2 exacto. No es una etapa: sus checkboxes, si los hubiera, no cuentan como tareas. Una línea `**Objetivo**:` dentro de una etapa sigue siendo el criterio de esa etapa, no el objetivo del proyecto.
+- `**Alcance**` es una lista separada por comas. Cada referencia es la clave de una etapa del mismo roadmap (`Etapa 5`, `Fase 2`; se compara el inicio del título sin distinguir mayúsculas) o un cambio OpenSpec del repo (`openspec:<nombre-del-cambio>`, activo o archivado). Una referencia que no existe se muestra como aviso y no aporta tareas.
+- `**Fecha objetivo**` es opcional.
+- `## Objetivos cumplidos` es opcional: una línea por objetivo, `- AAAA-MM-DD — <nombre>: <criterio>`.
+- Una tarea tachada (`- [ ] ~~Soporte offline~~`) está **cancelada**: se conserva en el historial y no cuenta en el denominador.
+
+**Cálculo**: avance del objetivo = tareas `[x]` del alcance ÷ (tareas del alcance − canceladas), siempre mostrado con numerador y denominador. Un `[x]` en el `ROADMAP.md` y un `[x]` en el `tasks.md` de un cambio OpenSpec valen igual, porque ambos se marcan solo tras verificar. Sin objetivo declarado, el dashboard muestra "Sin objetivo declarado" en vez de un porcentaje. Un objetivo al 100% no significa que el proyecto esté terminado: hay que declarar el siguiente.
+
+---
+
 ## 🔄 Flujo de Trabajo
 
 El ciclo de desarrollo estandarizado conecta la visión del desarrollador con la ejecución del agente y la observabilidad del sistema:

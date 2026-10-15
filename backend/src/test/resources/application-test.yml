@@ -1,0 +1,13 @@
+# Integration tests run against a real local Postgres: the schema uses JSONB (no H2) and the dev machine has no
+# Docker for Testcontainers. Create it once: CREATE DATABASE agent_project_test OWNER agent_project;
+spring:
+  r2dbc:
+    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${TEST_DB_NAME:agent_project_test}
+  flyway:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${TEST_DB_NAME:agent_project_test}
+
+agent-project:
+  sync:
+    inbox-dir: ${java.io.tmpdir}/agent-project-test-inbox
+  agent:
+    token: test-token

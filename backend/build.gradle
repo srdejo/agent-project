@@ -1,47 +1,78 @@
 plugins {
-    id 'java'
-    alias(libs.plugins.spring.boot) apply false
-    alias(libs.plugins.spring.dependency.management) apply false
+	id 'org.springframework.boot' version '4.1.1'
+	id 'io.spring.dependency-management' version '1.1.7'
+	id 'java'
+	id 'jacoco'
 }
 
-allprojects {
-    group = 'co.com.srdejo.agentproject'
-    version = '0.0.1-SNAPSHOT'
+group = 'co.com.srdejo'
+version = '0.0.1-SNAPSHOT'
 
-    repositories {
-        mavenCentral()
-    }
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(26)
+	}
 }
 
-subprojects {
-    apply plugin: 'java'
-    apply plugin: 'io.spring.dependency-management'
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
 
-    java {
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(21)
-        }
-    }
+repositories {
+	mavenCentral()
+}
 
-    dependencyManagement {
-        imports {
-            mavenBom "org.springframework.boot:spring-boot-dependencies:${rootProject.libs.versions.springBoot.get()}"
-        }
-    }
+ext {
+	springBootVersion = "4.1.0"
+	mapstructVersion = "1.6.3"
+	lombokVersion = "1.18.48"
+	lombokMapstructBindingVersion = "0.2.0"
+	openApiVersion = "3.1.1"
+}
 
-    dependencies {
-        testImplementation rootProject.libs.junit.jupiter
-        testImplementation rootProject.libs.mockito.core
-        testImplementation rootProject.libs.assertj.core
-        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    }
+dependencies {
+	implementation "org.springframework.boot:spring-boot-starter-webflux:${springBootVersion}"
+	implementation "org.springframework.boot:spring-boot-starter-validation:${springBootVersion}"
+	implementation "org.springframework.boot:spring-boot-starter-data-r2dbc:${springBootVersion}"
+	runtimeOnly "org.postgresql:r2dbc-postgresql"
+	implementation "org.springframework.boot:spring-boot-starter-flyway:${springBootVersion}"
+	implementation "org.flywaydb:flyway-database-postgresql"
+	runtimeOnly "org.postgresql:postgresql"
+	developmentOnly "org.springframework.boot:spring-boot-devtools:${springBootVersion}"
+	testImplementation "org.springframework.boot:spring-boot-starter-test:${springBootVersion}"
+	testImplementation "org.springframework.boot:spring-boot-webflux-test:${springBootVersion}"
+	testImplementation "io.projectreactor:reactor-test"
 
-    tasks.withType(Test).configureEach {
-        useJUnitPlatform()
-    }
+	// Needed at compile time: the JSONB converters build io.r2dbc.postgresql.codec.Json values.
+	compileOnly "org.postgresql:r2dbc-postgresql"
+	testImplementation "org.postgresql:r2dbc-postgresql"
 
-    tasks.withType(JavaCompile).configureEach {
-        options.encoding = 'UTF-8'
-        options.compilerArgs << '-parameters'
-    }
+	implementation "org.mapstruct:mapstruct:${mapstructVersion}"
+	compileOnly "org.projectlombok:lombok:${lombokVersion}"
+	annotationProcessor "org.projectlombok:lombok-mapstruct-binding:${lombokMapstructBindingVersion}"
+	annotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
+	annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+	testCompileOnly "org.projectlombok:lombok:${lombokVersion}"
+	testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+
+	implementation "org.springdoc:springdoc-openapi-starter-webflux-ui:${openApiVersion}"
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+	options.compilerArgs << '-parameters'
+}
+
+test {
+	finalizedBy jacocoTestReport
+}
+
+bootJar {
+	archiveFileName = 'agent-project-backend.jar'
 }

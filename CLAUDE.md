@@ -14,15 +14,16 @@ Para el estado real del código, decisiones tomadas y qué falta, ver (en ese or
 
 ## Stack
 
-- **Backend**: `backend/` — Java 21, Spring Boot 3.4.x, Gradle multi-módulo (Groovy DSL), **Spring Data JPA + Hibernate**, Flyway, PostgreSQL. `agent-project` es el primer proyecto del autor construido con esta convención (ver `docs/DECISIONS.md`) — `consulting`/`distriapp`/`hotel` usan JdbcTemplate, decisión puntual de esos repos que no se migra retroactivamente.
+- **Backend**: `backend/`, sobre el arquetipo hexagonal reactivo `powerup-arquetipo-rx` (`D:\Workspace Daniel\02-sandbox\pragma\powerup-arquetipo-rx`). Un solo módulo Gradle, Java 26, Spring Boot 4.1, **WebFlux + Spring Data R2DBC**, Flyway (con conexión JDBC propia), PostgreSQL, MapStruct, Lombok, springdoc (`/swagger-ui.html`) y JaCoCo. Es una **excepción** registrada a la convención "Spring Data JPA por defecto" del autor (ver `docs/DECISIONS.md`).
 - **Frontend**: `frontend/` — Angular 22, standalone components, signals, `@if`/`@for`, Tailwind CSS.
-- Sin endpoint de escritura público: los datos entran vía un job que lee archivos JSON de un inbox en disco (`docs/SYNC_PROTOCOL.md`), no vía HTTP.
+- Sin endpoint de escritura: los datos entran por un job que lee `snapshot.json` de un inbox en disco (`docs/SYNC_PROTOCOL.md`), no por HTTP. Todo el sitio está detrás de oauth2-proxy (login de Google).
 
 ## Convenciones de código
 
 - Todo el código (paquetes, clases, campos, tablas/columnas) en **inglés**.
-- Backend: capas `web` (controller/DTO) → `service` → `repository` (`JpaRepository`) → `model` (`@Entity`) dentro de cada módulo de `modules/*`. La entidad JPA nunca sale del módulo — se mapea a DTO en `web`/`service`. Ver el skill `senior-backend-dev` para los patrones completos (`references/spring-data-jpa.md`).
-- `modules/projects` y `modules/parser` no dependen de otros módulos de negocio entre sí. `modules/progress` depende de ambos (aplica el sync validado por `parser` sobre `projects` vía `ProjectSyncPort`) — es la única dependencia cruzada permitida hoy; cualquier otra debe documentarse en `ARCHITECTURE.md`.
+- Backend: capas del arquetipo, con las dependencias apuntando hacia adentro. `domain` (`model`, `api` = puertos de entrada `I…ServicePort`, `spi` = puertos de salida `I…PersistencePort`, `usecase`) es Java puro más `reactor-core` y Lombok, sin Spring ni R2DBC. `application` (`handler`, `dto`, `mapper` con MapStruct) convierte modelo de dominio en DTO. `infrastructure` contiene los adaptadores (`input/rest`, `input/inbox`, `input/websocket`, `out/r2dbc`, `out/agent`) y la configuración: `BeanConfiguration` conecta puertos y adaptadores, y los use cases no llevan anotaciones de Spring. Las entidades R2DBC nunca salen de `infrastructure/out/r2dbc`.
+- La regla de avance vive solo en `ProgressCalculator` (`domain/usecase`). Si cambia, sube `RULE_VERSION` para que los proyectos se re-deriven en el próximo snapshot.
+- Tests: los use cases se prueban con puertos en memoria y `StepVerifier`. La integración (adaptador R2DBC, inbox y REST) corre contra **Postgres local real** (`agent_project_test`, ver `src/test/resources/application-test.yml`): no hay Docker en la máquina de desarrollo y el esquema usa JSONB, que H2 no soporta.
 - Sin comentarios que expliquen QUÉ hace el código. Comentarios solo para el PORQUÉ no obvio.
 - No añadir abstracciones, validaciones o manejo de errores para escenarios que no pueden ocurrir. YAGNI.
 - Frontend: componentes standalone, lazy-loaded por feature, signals para estado local, sin `NgModule`.

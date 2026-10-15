@@ -1,177 +1,211 @@
 # SYNC_PROTOCOL.md
 
-Contrato entre OpenClaw (u otro agente, corriendo en la máquina del desarrollador) y el backend de `agent-project` para mantener el dashboard actualizado. El backend **no** hace polling de Git ni parsea Markdown — solo lee JSON que otro proceso deposita en su inbox.
+Contrato entre el generador del portafolio (`infra/portfolio/portfolio.py`, que corre en la máquina del desarrollador) y el backend de `agent-project`. El backend no clona repos ni lee Markdown: solo procesa el snapshot JSON que el generador deposita en su inbox.
 
-## Cómo saber si el backend está vivo antes de subir nada
+**Formato vigente: v2** (desde 2026-10-15, cambio OpenSpec `control-center-fase-1`). Reemplaza a `progreso.json`/`nuevo.json`, que el backend ya no procesa (ver [Formato obsoleto](#formato-obsoleto)).
 
-`agent-project` corre en `nolost-vps` **desplegado y en vivo** desde 2026-08-19 como servicio `systemd` (`agent-project.service`, puerto `8083` loopback) — **no** como contenedor Docker, no hay nada que "levantar" aparte de eso. Antes de asumir que no está desplegado, chequear:
+## Comprobar que el backend está vivo
 
-```bash
-curl -s -o /dev/null -w '%{http_code}\n' https://agent.srdejo.com.co/api/projects   # 200 = vivo
-ssh srdejo@nolost-vps "systemctl is-active agent-project"                           # active = corriendo
-```
-
-Si está `active`/`200`, alcanza con subir los archivos al inbox — no hace falta desplegar ni reiniciar nada. La detección es reactiva (`WatchService` sobre `inboxDir`, ver `InboxSyncJob`): apenas se crea o modifica `progreso.json`/`nuevo.json` en el inbox, el backend lo procesa (con un debounce de ~400ms para coalescer ambos archivos en un solo ciclo si llegan casi juntos).
-
-## Consultar el API antes de clasificar progreso.json vs nuevo.json
-
-Antes de armar los dos archivos, consultar `GET /api/projects` (`https://agent.srdejo.com.co/api/projects`) para saber qué ids ya existen en la base:
+`agent-project` corre en `nolost-vps` como servicio `systemd` (`agent-project.service`, puerto `8083` loopback), detrás de oauth2-proxy.
 
 ```bash
-curl -s https://agent.srdejo.com.co/api/projects
+ssh srdejo@nolost-vps "systemctl is-active agent-project"                 # active = corriendo
+ssh srdejo@nolost-vps "curl -s http://127.0.0.1:8083/api/health/sync"      # último sync y antigüedad
 ```
 
-La respuesta trae `projects[].id` — esa es la lista real de proyectos ya creados. Cualquier proyecto de `docs/` (o `README.md`, si `docs/` no existe o está vacía) cuyo id **no** aparezca ahí va en `nuevo.json`; los que sí aparezcan van en `progreso.json`. No confiar en memoria de sesiones anteriores ni asumir la lista — el API es la fuente de verdad, puede haber cambiado (proyectos creados manualmente, borrados, etc.).
+## Un archivo por corrida: `snapshot.json`
 
-## Dos archivos fijos, no uno por proyecto
-
-En cada corrida, OpenClaw barre la carpeta `docs/` de todos los proyectos registrados y genera **como máximo dos archivos**, cada uno un mapa `id de proyecto -> datos`:
-
-- **`progreso.json`** — actualizaciones para proyectos que **ya existen** en la base.
-- **`nuevo.json`** — proyectos que **todavía no existen** y hay que crear.
+Cada corrida del generador produce **un solo archivo** con el estado completo de todos los repos:
 
 ```
-<deploy-dir>/data/inbox/progreso.json
-<deploy-dir>/data/inbox/nuevo.json
+<deploy-dir>/data/inbox/snapshot.json
 ```
 
-Rutas reales:
-- **Prod (`nolost-vps`)**: `/home/srdejo/agent-project/data/inbox/progreso.json` — `WorkingDirectory` del `systemd` unit apunta directo ahí (ver `docs/DEPLOYMENT.md`).
-- **Local (`gradlew bootRun`)**: `agent-project/backend/bootstrap/data/inbox/progreso.json` — el working dir de `bootRun` es el módulo `bootstrap`, no la raíz de `backend/`. (El path `backend/data/inbox/` que documentaba una versión anterior de este archivo estaba mal.)
+- **Prod**: `/home/srdejo/agent-project/data/inbox/snapshot.json`
+- **Local** (`gradlew bootRun`): `agent-project/backend/bootstrap/data/inbox/snapshot.json`, porque el directorio de trabajo de `bootRun` es `bootstrap/`.
 
-El backend reacciona en cuanto alguno de los dos archivos aparece en el inbox (`WatchService`, sin polling). Se procesa **entero** (cada entrada del mapa se valida y aplica de forma independiente — una entrada mala no bloquea al resto) y **se borra siempre al terminar**, haya habido cambios o no. OpenClaw regenera estos archivos frescos en cada una de sus propias corridas; el histórico real vive en la tabla `project_snapshots`, no en el filesystem.
+El backend detecta el archivo al instante (`WatchService` con debounce de ~400 ms), lo procesa entero y **lo borra al terminar**, haya o no cambios. El histórico vive en la base de datos, no en el filesystem.
 
-## Cómo subirlos de forma atómica
+### Subida atómica
 
-El backend puede estar leyendo el directorio mientras se sube un archivo. Mismo patrón que `nolost/deploy.ps1`, aplicado a cada archivo:
+El backend puede estar leyendo el directorio mientras llega el archivo, así que se sube con nombre temporal y se renombra:
 
 ```powershell
-scp progreso.json nolost-vps:/home/srdejo/agent-project/data/inbox/progreso.json.tmp
-ssh nolost-vps "mv /home/srdejo/agent-project/data/inbox/progreso.json.tmp /home/srdejo/agent-project/data/inbox/progreso.json"
-
-scp nuevo.json nolost-vps:/home/srdejo/agent-project/data/inbox/nuevo.json.tmp
-ssh nolost-vps "mv /home/srdejo/agent-project/data/inbox/nuevo.json.tmp /home/srdejo/agent-project/data/inbox/nuevo.json"
+scp snapshot.json nolost-vps:/home/srdejo/agent-project/data/inbox/snapshot.json.tmp
+ssh nolost-vps "mv /home/srdejo/agent-project/data/inbox/snapshot.json.tmp /home/srdejo/agent-project/data/inbox/snapshot.json"
 ```
 
-## Esquema JSON
+## Principio: el generador reporta hechos, el backend decide
 
-Mapa cuya clave es el **id del proyecto** (ya no va como campo `id` adentro del objeto). Campos requeridos por entrada: `name`, `repo`, `progress` (0–100), `status`, `verify`, `last_modified`. El resto son opcionales — si faltan, se normalizan a `null` o lista vacía. `status` debe ser uno de `IN_PROGRESS | BLOCKED | STARTED | COMPLETED`; `verify` uno de `PASSED | ATTENTION | PENDING`. `last_modified` es un datetime ISO-8601 con offset (ej. `2026-08-19T18:00:00-05:00`). `priority`, si viene, debe ser uno de `NOW | NEXT | DECIDE | ON_TRACK | FROZEN`. `priority_rank`, si viene, debe ser un **entero mayor o igual a 1**: si no es un número entero (una cadena `"2"`, un decimal `2.5`, un booleano) o es menor que 1, la entrada se descarta.
+El generador **no calcula** porcentajes, estados de tarea ni estado del proyecto. Envía lo que hay en los archivos: checkboxes, marcadores de etapa, si la etapa tiene criterio, si es backlog y las referencias del objetivo. El backend deriva todo lo demás con una sola regla (`ProgressCalculator`, spec `progress-model`). Para cambiar la regla se cambia el backend, no el generador.
 
-> ⚠️ **Dos campos `status` distintos, no confundirlos.** El `status` del proyecto (raíz del objeto) es el enum en **MAYÚSCULAS** `IN_PROGRESS|BLOCKED|STARTED|COMPLETED` y solo describe el estado general del proyecto en el detalle — **no alimenta ningún contador del listado**. El `status` de cada tarea (`tasks[].status`) es un enum aparte en **minúsculas** `done|wip|blocked|todo`, y es el único que suma al contador **"BLOCKED"** (y a "VERIFIED TASKS") del dashboard — ver `ProjectQueryService.countByStatus`, que compara el string tal cual, sin normalizar mayúsculas/minúsculas. Si el proyecto está bloqueado pero ninguna tarea tiene `"status": "blocked"`, el contador queda en 0 aunque `status: "BLOCKED"` esté puesto en la raíz. Y si por error se escribe `"BLOCKED"` (mayúscula) dentro de `tasks[]`, esa tarea se descarta por completo (ver [Reglas de validación](#reglas-de-validación-por-archivo)) y tampoco cuenta.
+## Esquema
 
 ```json
 {
-  "nolost": {
-    "last_modified": "2026-08-19T18:00:00-05:00",
-    "name": "Mi Casa Church",
-    "repo": "nolost",
-    "progress": 42,
-    "stage": "Fase 3 — Mentoreo MVP",
-    "status": "IN_PROGRESS",
-    "updated": "19 Aug 12:00",
-    "commit": "8413025",
-    "verify": "PASSED",
-    "summary": "Plataforma de gestión para la iglesia: consolidación de miembros, mentoreo y asistencia.",
-    "alias": "Mi Casa · Consolidación",
-    "priority": "NOW",
-    "priority_rank": 1,
-    "open_question": "¿Quién valida los datos de consolidación antes de migrarlos?",
-    "stack": ["Node", "React", "PostgreSQL"],
-    "tasks": [
-      { "name": "Consolidación de miembros", "stage": "Fase 3", "status": "done", "date": "18 Ago", "commit": "8413025" },
-      { "name": "Toma de asistencia móvil", "stage": "Fase 3", "status": "wip", "date": "19 Ago", "commit": "—" }
-    ],
-    "checks": [{ "name": "./gradlew test", "ok": true, "duration": "12s" }],
-    "events": [{ "time": "12:00", "mark": "✓", "text": "Progress synchronization" }]
-  },
-  "hotel": {
-    "last_modified": "2026-08-19T17:45:00-05:00",
-    "name": "Hotel Management",
-    "repo": "hotel-management",
-    "progress": 68,
-    "status": "IN_PROGRESS",
-    "verify": "PASSED"
+  "format_version": 2,
+  "generator_version": "portfolio.py 2.0",
+  "generated_at": "2026-10-15T07:00:00-05:00",
+  "projects": {
+    "distriapp": {
+      "name": "DistriApp — SCI 360",
+      "repo": "distriapp",
+      "alias": "SCI 360 · Multimarcasa",
+      "summary": "Sistema comercial multitenant para distribuidoras.",
+      "state": "ACTIVE",
+      "priority_rank": 1,
+      "stack": ["Java 21", "Spring Boot", "Angular 22"],
+      "blockers": [
+        {
+          "id": "datos-reales",
+          "type": "EXTERNAL_DEPENDENCY",
+          "description": "Falta el Excel real de ventas del cliente",
+          "impact": "Sin él no se puede cerrar la Etapa 3",
+          "affects": ["Etapa 3"],
+          "owner": "Cliente",
+          "created": "2026-10-01",
+          "resolution": "El cliente entrega el archivo de septiembre"
+        }
+      ],
+      "source_commit": "8413025",
+      "source_modified_at": "2026-10-14T18:00:00-05:00",
+      "roadmap": {
+        "objective": {
+          "name": "MVP E2E sin mocks",
+          "criteria": "Un asesor ve diagnósticos calculados con datos reales",
+          "scope": ["Etapa 1", "Etapa 2", "openspec:mvp-e2e-sin-mocks"],
+          "target_date": "2026-11-30"
+        },
+        "achieved": [
+          { "date": "2026-09-04", "name": "Gobernanza", "criteria": "Documentación consistente con el código" }
+        ],
+        "stages": [
+          {
+            "key": "Etapa 1",
+            "title": "Etapa 1 — Backend arrancable contra Postgres real",
+            "marker": "in_progress",
+            "has_criteria": true,
+            "backlog": false,
+            "tasks": [
+              { "text": "Arrancar bootstrap contra Postgres", "line": 42, "checked": true, "cancelled": false },
+              { "text": "Soporte offline", "line": 43, "checked": false, "cancelled": true }
+            ]
+          },
+          {
+            "key": null,
+            "title": "Mejoras futuras",
+            "marker": "none",
+            "has_criteria": false,
+            "backlog": true,
+            "tasks": []
+          }
+        ]
+      },
+      "openspec": {
+        "specs_count": 0,
+        "archived_count": 3,
+        "commands": ["apply", "archive", "explore", "propose", "sync", "update"],
+        "changes": [
+          {
+            "name": "mvp-e2e-sin-mocks",
+            "metadata": "schema: spec-driven\ncreated: 2026-10-05\n",
+            "artifacts": {
+              "proposal": { "content": "# Proposal\n...", "truncated": false },
+              "tasks": { "content": "# Tasks\n...", "truncated": false },
+              "specs": [
+                { "path": "specs/ingestion/spec.md", "content": "# Spec Delta\n...", "truncated": false }
+              ]
+            },
+            "tasks": [
+              { "number": "1.1", "text": "Leer el Excel real", "section": "1. Ingesta", "line": 5, "checked": true, "cancelled": false },
+              { "number": "1.2", "text": "Normalizar columnas", "section": "1. Ingesta", "line": 6, "checked": false, "cancelled": false }
+            ]
+          },
+          { "name": "cambio-ilegible", "error": "tasks.md: permiso denegado" }
+        ],
+        "archived_in_scope": []
+      }
+    },
+    "contact": { "error": "docs/ROADMAP.md: no se pudo leer (permiso denegado)" }
   }
 }
 ```
 
+### Nivel archivo
+
 | Campo | Tipo | Requerido | Notas |
 |---|---|---|---|
-| (clave del mapa) | string | sí | Id estable del proyecto. |
-| `last_modified` | datetime ISO-8601 | sí | Metadata de última modificación — el backend compara este valor contra el guardado para decidir si actualiza (ver más abajo). No es la fecha del sync, es la del estado que describe. |
-| `name` | string | sí | Nombre mostrado en el dashboard. |
+| `format_version` | int | sí | Debe ser `2`. Cualquier otro valor rechaza el archivo entero. |
+| `generator_version` | string | no | Se guarda en el sync run, para auditar. |
+| `generated_at` | datetime ISO-8601 con offset | sí | Momento de la lectura de los repos. De aquí sale la antigüedad de los datos (`/api/health/sync`). |
+| `projects` | objeto `id -> entrada` | sí | Id estable del proyecto (nombre de la carpeta del repo). |
+
+### Entrada de proyecto
+
+Una entrada es **o bien** `{ "error": "<motivo>" }` (el repo no se pudo leer), **o bien** el estado completo:
+
+| Campo | Tipo | Requerido | Notas |
+|---|---|---|---|
+| `name` | string | sí | Nombre mostrado. |
 | `repo` | string | sí | Nombre corto del repositorio. |
-| `progress` | int 0–100 | sí | Porcentaje de avance. |
-| `stage` | string | no | Etapa/fase actual, texto libre. |
-| `status` | enum | sí | `IN_PROGRESS \| BLOCKED \| STARTED \| COMPLETED`. |
-| `updated` | string | no | Etiqueta de última actualización (texto libre). |
-| `commit` | string | no | SHA corto del commit que originó este estado. |
-| `verify` | enum | sí | `PASSED \| ATTENTION \| PENDING`. |
-| `summary` | string | no | Descripción del proyecto en 1–2 frases, para la sección "Qué es este proyecto" del detalle. |
-| `alias` | string | no | Subtítulo corto del proyecto, máx. 120 caracteres (ej. `SCI 360 · Multimarcasa`). Capa editorial: **no se deriva de nada**, lo decide el usuario. Un alias más largo que 120 caracteres descarta la entrada. |
-| `priority` | enum | no | `NOW \| NEXT \| DECIDE \| ON_TRACK \| FROZEN`. Prioridad editorial del proyecto dentro del portafolio. Un valor fuera del enum descarta la entrada, igual que `status`/`verify`. |
-| `priority_rank` | int ≥ 1 | no | Posición del proyecto en el orden de prioridad del portafolio (`1` = el primero que se atiende). Capa editorial, igual que `priority`, pero responde otra pregunta: `priority` dice **en qué grupo de decisión está** el proyecto, `priority_rank` dice **en qué orden se atiende**. Un valor que no sea entero, o menor que 1, descarta la entrada. |
-| `open_question` | string | no | La única pregunta sin responder que desbloquea el proyecto. Texto libre largo, también editorial. |
-| `stack` | string[] | no | Tecnologías/stack del proyecto (tags en el detalle). |
-| `tasks` | `{name, stage, status, date, commit}[]` | no | Tareas individuales del roadmap. `status` uno de `done \| wip \| blocked \| todo` (**minúsculas, distinto del `status` del proyecto**) — **`done` solo si hay evidencia de verificación real, nunca porque se escribió código** (misma regla que `progress`, ver más abajo). Es el campo que alimenta la tabla "Tareas desarrolladas" del detalle y los conteos de "BLOCKED"/"VERIFIED TASKS" del listado — el `status` del proyecto no cuenta para esas cifras. |
-| `checks` | `{name, ok, duration}[]` | no | Última corrida de verificación. |
-| `events` | `{time, mark, text}[]` | no | Feed de actividad reciente del agente. |
+| `state` | enum | sí | `ACTIVE \| NEXT \| PAUSED \| BLOCKED \| MAINTENANCE \| COMPLETED \| ARCHIVED`. Editorial: lo declara el usuario y **nunca** se deriva del %. |
+| `priority_rank` | int ≥ 1 | no | Orden en el portafolio (1 = primero). |
+| `alias`, `summary` | string | no | Editoriales. |
+| `stack` | string[] | no | |
+| `blockers` | objeto[] | no | Ver [Bloqueos](#bloqueos). |
+| `source_commit` | string | no | SHA corto del último commit del repo. |
+| `source_modified_at` | datetime ISO-8601 con offset | no | Última modificación conocida del repo (commit o archivos sin commitear). Se muestra como "última actividad". |
+| `roadmap` | objeto | no | Presente solo si existe `docs/ROADMAP.md`. |
+| `openspec` | objeto | no | Presente solo si existe `openspec/`. |
 
-`project_snapshots` (histórico) lo calcula el backend — no va en el JSON.
+### `roadmap`
 
-## Capa editorial: `alias`, `priority`, `priority_rank`, `open_question`
+| Campo | Notas |
+|---|---|
+| `objective` | `{name, criteria, scope[], target_date}`, leído de `## Objetivo actual: <nombre>` (formato en `README.md`). `null` o ausente = sin objetivo declarado. `scope` son las referencias en texto, tal cual: el backend las resuelve. |
+| `achieved` | `[{date, name, criteria}]`, leído de `## Objetivos cumplidos`. |
+| `stages` | Una por encabezado de etapa, en orden. `key` es `Etapa N` / `Fase N` (o `null` si el encabezado no tiene número). `marker`: `closed` (🟢), `in_progress` (🟡 / ⚠️) o `none`. `has_criteria`: la etapa tiene `**Criterio de cierre**`, `**Objetivo**`, `## Objetivo` o `### Resultado`. `backlog`: el encabezado dice "fuera de alcance", "mejoras futuras", "no roadmapeado", "no priorizadas", "ideas" o "backlog". Las tareas de una etapa backlog no se cuentan. |
+| `stages[].tasks` | `{text, line, checked, cancelled}`. `cancelled` = texto tachado `~~…~~`. |
 
-Estos cuatro campos son la **capa editorial** del portafolio: no se derivan del repo, del roadmap ni de Git — los decide el usuario. Los cuatro son opcionales y anulables, y por eso siguen una regla distinta a la del resto de campos:
+### `openspec`
 
-- **Si el campo no viene en el JSON** → se **conserva** el valor que ya tenía el proyecto en la base. Un `progreso.json` que no los traiga sigue siendo válido y no borra nada.
-- **Si el campo viene explícitamente como `null`** (o como cadena vacía) → se **limpia** el valor guardado.
+| Campo | Notas |
+|---|---|
+| `specs_count`, `archived_count` | Conteos de `openspec/specs/*` y `openspec/changes/archive/*`. |
+| `commands` | Comandos `opsx` instalados, según los archivos de `.claude/commands/opsx/`. El dashboard solo sugiere estos. |
+| `changes` | Cambios activos (`openspec/changes/*` salvo `archive/`). Cada uno: `name`, `metadata` (`.openspec.yaml` como texto), `artifacts` (solo los que existen: `proposal`, `design`, `tasks`, `specs[]` con `path`) y `tasks` (`number`, `text`, `section`, `line`, `checked`, `cancelled`, una por checkbox, incluidas las anidadas). Un cambio ilegible viaja como `{name, error}`. |
+| `archived_in_scope` | Solo los cambios archivados que referencia el alcance del objetivo, con `name` (nombre de la carpeta archivada) y `tasks`. Sin artefactos. |
 
-Es decir, "ausente" y "`null`" **no** significan lo mismo: omitir el campo es "no lo toques", mandarlo en `null` es "bórralo". El parser distingue ambos casos (`node.has(campo)` vs. `node.get(campo).isNull()`), así que para vaciar un alias hay que mandarlo explícitamente en `null`, no simplemente dejar de enviarlo.
+Cada artefacto lleva `content` y `truncated`. **Límite: 200 KB por artefacto.** Si un artefacto lo supera, se envía truncado con `truncated: true`.
 
-`priority` solo se valida contra el enum cuando viene presente y no es `null`; un valor fuera de `NOW | NEXT | DECIDE | ON_TRACK | FROZEN` descarta la entrada completa con warning, sin bloquear al resto del archivo.
+### Bloqueos
 
-Los cuatro se exponen en el API como `alias`, `priority`, `priorityRank` y `openQuestion` (camelCase en la salida JSON, igual que `tasksDone`/`tasksTotal`), tanto en el listado (`GET /api/projects`) como en el detalle (`GET /api/projects/{id}`).
+`blockers[]`: `{id, type, description, impact?, affects?[], owner?, created?, resolution?}`.
 
-### `priority` es el grupo, `priority_rank` es el orden
+- `type` es uno de `PRODUCT_DECISION | EXTERNAL_DEPENDENCY | TECHNICAL | ENVIRONMENT | SECURITY | UNKNOWN`.
+- `affects` admite las mismas referencias que el alcance del objetivo (`Etapa 3`, `openspec:<cambio>`).
+- Una decisión que afecta a varias cosas es **un** bloqueo con varios `affects`, no varios bloqueos.
 
-Son dos campos distintos y **no se reemplazan entre sí**:
+## Cómo aplica el backend cada entrada
 
-- **`priority`** (`NOW | NEXT | DECIDE | ON_TRACK | FROZEN`) es el **grupo de decisión**: en qué estado está el proyecto dentro del portafolio (se está trabajando ahora, entra después, falta decidir algo, va en carril, está congelado).
-- **`priority_rank`** (entero ≥ 1) es la **posición en la fila**: en qué orden se atiende, siendo `1` el primero. Dos proyectos pueden compartir grupo (`NOW` los dos) y aun así tener un orden claro entre ellos (`1` y `2`).
+1. **Detección de cambios por contenido.** El backend calcula el SHA-256 del JSON canónico de la entrada (claves ordenadas). Si coincide con el guardado, responde `UNCHANGED` y no toca nada. Si es distinto, responde `UPDATED`. Si el id no existía, responde `CREATED`. Así, cualquier cambio en lo reportado (un checkbox sin commitear, un cambio de rúbrica del generador) se aplica sin trucos de fechas.
+2. **Reemplazo completo.** Una entrada `UPDATED`/`CREATED` reemplaza el estado entero del proyecto: etapas, tareas, objetivo, cambios y bloqueos. No hay "ausente conserva": lo que no viene, deja de existir.
+3. **Excepción, un cambio ilegible.** Un cambio que llega como `{name, error}` conserva su última versión válida (tareas y artefactos) y se marca con el error y su fecha.
+4. **Repo ilegible.** Una entrada `{error}` conserva el último estado del proyecto y guarda el error con su fecha.
+5. **Proyectos ausentes.** Un proyecto guardado que no aparece en un snapshot válido se marca con `missing_since`, y no se borra. Si vuelve a aparecer, la marca se limpia.
 
-El backend **no** valida que los rangos sean únicos ni consecutivos, ni que sean coherentes con el grupo — eso corre por cuenta de quien genera el JSON. Lo único que valida es que, si el campo viene, sea un entero ≥ 1.
+## Validación
 
-### Cómo se limpia un `priority_rank`
+- **Archivo**: JSON inválido, raíz que no es objeto, falta de `projects`, `generated_at` no parseable o `format_version` ≠ 2 → no se aplica nada; el sync run registra el error de archivo.
+- **Entrada**: falta `name`/`repo`/`state`, `state` fuera del enum, `priority_rank` no entero o menor que 1, `roadmap`/`openspec` con estructura incorrecta (p. ej. `marker` inválido, `checked` no booleano) → se rechaza esa entrada con su motivo; las demás se aplican.
+- **Parcial**: un bloqueo sin `id`/`type`/`description` o con `type` fuera del enum se descarta solo, con aviso en el sync run; el resto de la entrada se aplica.
 
-`alias`, `priority` y `open_question` son cadenas, así que "vacío" (`""`) alcanza como marca interna de "límpialo". `priority_rank` es un entero y no tiene cadena vacía, así que usa **`0`** como esa misma marca: un valor fuera de su propio dominio, ya que un rango válido siempre arranca en `1`. Esto es interno del backend — desde el JSON la regla es la misma que para los otros tres:
+## Formato obsoleto
 
-- `priority_rank` **ausente** → se conserva el rango guardado.
-- `"priority_rank": null` → se **borra** el rango guardado.
-- `"priority_rank": 0` (o negativo) → **descarta la entrada** con warning. Para borrar el rango hay que mandar `null`, no `0`.
-
-## Reglas de validación por archivo
-
-- **`progreso.json`**: cada clave debe ser un id **ya existente**. Si no existe, esa entrada se descarta (log de warning) — no crea proyectos. Si existe: se compara `last_modified` recibido contra el guardado; igual → no se toca la base; distinto → se aplica el update y se guarda una nueva fila en `project_snapshots`.
-- **`nuevo.json`**: cada clave debe ser un id que **no existe todavía**. Si ya existe, esa entrada se descarta (log de warning) — no pisa proyectos existentes vía este archivo. Si no existe, se crea.
-
-Una entrada con campos inválidos (falta un requerido, `status`/`verify`/`priority` fuera del enum, `progress` fuera de 0–100, `priority_rank` que no sea entero o sea menor que 1, `alias` de más de 120 caracteres, `last_modified` no parseable, o algún `tasks[].status` fuera de `done|wip|blocked|todo`) también se descarta con warning — no bloquea al resto de las entradas del archivo.
+Si aparece `progreso.json` o `nuevo.json` en el inbox (un generador anterior a v2), el backend no lo aplica, registra un sync run con el error "formato obsoleto" y borra el archivo. Los datos guardados no cambian.
 
 ## Regla de negocio: nunca inventar progreso
 
-> No se actualiza el porcentaje porque el agente escribió código. Se actualiza cuando existe evidencia de avance (tarea del roadmap completa + verificación real). La misma regla aplica a `tasks[].status = "done"`: una tarea se marca `done` solo con evidencia real, nunca porque el código fue escrito.
+Un `[x]` en `docs/ROADMAP.md` o en un `tasks.md` de OpenSpec se marca **solo con verificación real**, nunca porque se escribió el código. El backend confía en esa convención del repo y muestra las tareas como "completadas según el repo". La evidencia independiente (Fase 2) se mostrará aparte.
 
-El backend no valida esto — es responsabilidad de quien genera el JSON (OpenClaw) no reportar `progress` ni `tasks[].status: "done"` sin evidencia real.
-
-## Regla de negocio: `blocked` también aplica por falta de definición, no solo por impedimento externo
-
-`tasks[].status = "blocked"` no es solo "algo externo me detuvo" (credenciales, API caída, dependencia de otro equipo). También aplica cuando, al leer el roadmap (`ROADMAP.md`/`TASKS.md`), la tarea **no tiene criterio de aceptación o alcance claro** para poder ejecutarla o verificarla — p. ej. un ítem del roadmap escrito de forma ambigua, sin definir qué significa "terminado" para esa tarea, o sin la validación/prueba que demuestre que se completó.
-
-> Si OpenClaw no puede determinar con qué evidencia verificar una tarea, esa tarea se marca `blocked` — nunca se infiere `done` "porque probablemente es lo que se quiso decir", ni se deja en `wip` indefinidamente sin señal de por qué no avanza.
-
-Esto es una extensión de la regla anterior (nunca inventar progreso): la ambigüedad en la definición de la tarea es, en sí misma, un bloqueador tan real como uno externo, y debe quedar visible en el dashboard igual que cualquier otro. Registrar la causa en `docs/PROGRESS.md`/`ROADMAP.md` del proyecto (sección "Bloqueadores") para que quede trazable de dónde viene.
-
-## Fuera de alcance de este documento
-
-Cómo OpenClaw lee `ROADMAP.md`/`PROGRESS.md`/`TASKS.md` y el estado de Git de cada proyecto para construir `progreso.json`/`nuevo.json`, y cómo se programa su envío periódico, corre por cuenta del usuario en su propia máquina — este documento solo define el contrato que el backend espera recibir.
-
-La implementación que hoy cumple ese rol vive en `infra/portfolio/` (raíz del workspace): un script determinista que deriva el estado de los `docs/ROADMAP.md`, no un agente. Su rúbrica de parseo está documentada en `infra/portfolio/README.md`.
+Una etapa sin marcador de estado y sin criterio de cierre deja sus tareas pendientes en `BLOCKED` por "falta de definición": si no se sabe con qué evidencia se verifica una tarea, eso es un bloqueo real. La solución es escribir el criterio en el roadmap, no tocar el generador.

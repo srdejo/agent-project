@@ -1,7 +1,1 @@
 rootProject.name = 'agent-project-backend'
-
-include 'bootstrap',
-        'platform:web-common',
-        'modules:projects',
-        'modules:parser',
-        'modules:progress'

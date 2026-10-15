@@ -14,7 +14,9 @@ Se preguntó explícitamente al usuario entre tres alcances (scaffolding vacío,
 Se preguntó explícitamente al usuario qué división de módulos usar (equivalente a `ingestion`/`customers`/... en `distriapp`). Eligió esta división de tres módulos en vez de un único módulo `core` o dejarlo indefinido.
 
 ### Sin módulo `platform:tenancy` ni `platform:security` todavía
-A diferencia de `consulting`/`distriapp` (multi-tenant, con login), `agent-project` no tiene definido aún si será multi-usuario o con autenticación — el README del estándar solo describe "proyectos públicos y privados" como visión a futuro (Fase 6). Se omitieron esos módulos platform por YAGNI hasta que haya una decisión de producto explícita sobre auth/multi-tenencia. **No confirmado con el usuario** — revisar antes de construir cualquier feature que dependa de usuarios o visibilidad pública/privada.
+A diferencia de `consulting`/`distriapp` (multi-tenant, con login), `agent-project` no tiene definido aún si será multi-usuario o con autenticación — el README del estándar solo describe "proyectos públicos y privados" como visión a futuro (Fase 6). Se omitieron esos módulos platform por YAGNI hasta que haya una decisión de producto explícita sobre auth/multi-tenencia.
+
+**Actualizado 2026-10-15**: el sitio **sí** está protegido, pero no desde la app. oauth2-proxy (login de Google con lista blanca de correos, `infra/vps/oauth2-proxy/`) va delante de todo el vhost de `agent.srdejo.com.co` vía `auth_request` de nginx: frontend, `/api/` y `/ws/`. El backend no conoce al usuario y sigue sin `platform:security`. Lo público, cuando llegue (Fase 3 del Control Center), irá bajo `/public/...` con una excepción explícita a `auth_request` en nginx y un DTO propio.
 
 ## Backend
 
@@ -75,3 +77,37 @@ El motivo es doble. El entorno del agente es efímero —cada sesión arranca co
 Alternativas descartadas: una **deploy key por repo** (son 10 y una llave sirve para un solo repositorio; además no se puede limitar a un patrón de ramas — eso lo hace un *ruleset*, no el tipo de credencial); un **token fino** con `Contents: Read and write` sobre los 10 repos (más simple que 10 llaves y sería la vía si algún día se automatiza, pero deja el token en disco y exigiría proteger `main` con un ruleset); y una **GitHub App** (lo más correcto, demasiado montaje para lo que se gana).
 
 Consecuencia práctica: que `git push` falle en el entorno del agente con `Host key verification failed` es el **comportamiento esperado**, no un problema por resolver ni un bloqueante que reportar. Cada sesión deja las ramas listas y los comandos de push en `RESUMEN-DIARIO.md`, en la raíz del workspace. Aplica a los 10 repos.
+
+## Control Center v2: reestructuración (2026-10-15)
+
+Cambio OpenSpec `control-center-fase-1`. Decisiones pedidas o confirmadas explícitamente por el usuario en la sesión de propuesta.
+
+### Reestructuración sin compatibilidad y descarte del historial
+El usuario pidió una "reestructuración grande", aunque implicara borrar archivos, y autorizó romper el contrato de sync, la API, el esquema y el frontend. También pidió descartar `project_snapshots`: ese historial mide el % global del roadmap, una métrica que deja de ser la principal, y mezclarlo con la nueva confunde. La migración `V7` borra las tablas anteriores. Alternativa descartada: una evolución incremental manteniendo `/api/projects`, que era la primera versión de la propuesta.
+
+### El avance se mide contra un objetivo declarado en el ROADMAP
+El % de antes, la suma de todos los checkboxes del roadmap, no respondía a nada útil: `micasachurch` marcaba 100% con trabajo pendiente y `perla-ai` 27% porque sumaba fases futuras. Cada repo declara `## Objetivo actual` (nombre, criterio de cierre, alcance con etapas y cambios OpenSpec) en su `docs/ROADMAP.md` (formato en `README.md`). El % principal es el del alcance; el del roadmap completo queda como secundario. Se eligió el ROADMAP del repo, y no `portfolio.json`, porque así el objetivo vive y se versiona junto al plan que lo cumple. Alternativas descartadas: un % global sumando OpenSpec, que seguía mezclando histórico y futuro, y un % de la etapa activa, que vuelve a 0 en cada etapa.
+
+### Un `[x]` de ROADMAP y uno de `tasks.md` valen lo mismo
+Ambos repos marcan solo tras verificar: el ROADMAP lo declara en su encabezado y las tareas OpenSpec traen su línea "Verificar:". Se etiquetan como "completadas según el repo", y la evidencia independiente se muestra aparte como "no disponible" hasta la Fase 2. Alternativa descartada: no contar OpenSpec hasta tener evidencia, lo que dejaría en 0% los objetivos que viven en OpenSpec (p. ej. `nolost`).
+
+### El backend deriva estados y avance; el generador solo reporta hechos
+Antes la rúbrica (estado de tarea, `progress`, `status`, `verify`) vivía en `infra/portfolio/portfolio.py`, sin tests y fuera del repo. Ahora el generador envía checkboxes, marcadores de etapa, criterio, backlog y alcance en crudo, y `ProgressCalculator` (`modules:projects`) aplica una sola regla testeada. Así la vista pública de la Fase 3 podrá usar la misma regla sin copiarla.
+
+### Vuelta al hash de contenido para detectar cambios
+Revierte la decisión del 2026-08-19 (`last_modified` en vez de hash). Con `last_modified`, cambiar la rúbrica obligaba a `-Bump` y los cambios sin commit dependían del `mtime`. El backend calcula ahora el SHA-256 del contenido canónico de cada entrada del snapshot. Sigue habiendo un solo mecanismo de detección. Si cambia la regla del backend, `progress_rule_version` fuerza una reaplicación.
+
+### Un único `snapshot.json` versionado en vez de `progreso.json`/`nuevo.json`
+Cada corrida envía el estado completo de cada repo y el backend reemplaza el proyecto entero. Desaparece la regla "ausente conserva / `null` limpia", que solo existía porque el JSON era parcial. Un repo ilegible conserva su último estado válido, y un proyecto que deja de reportarse se marca ausente pero no se borra.
+
+### El backend se rehace sobre el arquetipo `powerup-arquetipo-rx` (excepción a "JPA por defecto")
+Pedido explícito del usuario: aprovechar la reestructuración para usar su arquetipo hexagonal reactivo (`D:\Workspace Daniel\02-sandbox\pragma\powerup-arquetipo-rx`). Se eligió la versión **completa**: un solo módulo Gradle, Java 26, Spring Boot 4.1, WebFlux, R2DBC, Flyway con conexión JDBC propia, MapStruct, Lombok, springdoc y JaCoCo, con las capas `domain` (model/api/spi/usecase), `application` (handler/dto/mapper) e `infrastructure` (input/out/configuration). Desaparecen `bootstrap/`, `modules/*` y `platform/*`. Alternativas descartadas: adoptar solo la estructura hexagonal manteniendo MVC + JPA y Java 21, o el arquetipo completo sobre Java 21.
+
+Consecuencias:
+- Es la **excepción** a la convención "Spring Data JPA por defecto" de `CLAUDE.md` y del skill `senior-backend-dev`. `agent-project` deja de ser el repo de referencia de esa convención.
+- El VPS necesita JDK 26 para correr el jar.
+- El WebSocket del agente y el filtro de logging se portan a WebFlux.
+- Los tests de integración van contra Postgres local real. El H2 del arquetipo no soporta el JSONB del esquema, y no hay Docker para Testcontainers.
+
+### `priority`/`open_question` pasan a `state`/`blockers`
+Se adoptan los estados de proyecto del documento del Control Center (`ACTIVE | NEXT | PAUSED | BLOCKED | MAINTENANCE | COMPLETED | ARCHIVED`), declarados en la capa editorial y nunca derivados del %. Las preguntas pendientes pasan a ser bloqueos tipados (`PRODUCT_DECISION`, …), y una decisión que afecta a varias cosas se registra una sola vez, con sus `affects`. Alternativa descartada: conservar `priority` (`NOW | NEXT | DECIDE | ON_TRACK | FROZEN`). Mezclaba el estado del proyecto con la existencia de una decisión pendiente (`DECIDE`), y `open_question` no decía qué bloqueaba ni cuánto.
