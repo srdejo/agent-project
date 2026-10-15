@@ -7,7 +7,17 @@ spring:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:agent_project}
     username: ${DB_USER:agent_project}
     password: ${DB_PASSWORD:agent_project}
+    # El Postgres del VPS lo comparten ~13 apps con max_connections=100: el pool por defecto de Hikari (10) agotaba
+    # los cupos. Mismo limite que beauty; en local (local-deploy.ps1) DB_POOL_MAX=1.
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
   flyway:
+    # Conexion propia, fuera del pool de la app: Flyway toma una conexion extra para su bloqueo (y sus callbacks)
+    # mientras migra, y con el pool en 1 (local) la app no arrancaba.
+    url: ${spring.datasource.url}
+    user: ${spring.datasource.username}
+    password: ${spring.datasource.password}
     enabled: true
     locations: classpath:db/migration
   jpa:
