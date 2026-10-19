@@ -11,7 +11,7 @@ Cómo está desplegado `agent-project` en `nolost-vps`. **Desplegado y verificad
   GRANT ALL PRIVILEGES ON DATABASE agent_project TO agent_project;
   ALTER DATABASE agent_project OWNER TO agent_project;
   ```
-- Java 21 instalado.
+- **JDK 26** (desde Control Center v2, arquetipo reactivo): Eclipse Temurin en `/opt/java/temurin-26`, instalado con `sudo bash ~/java26/setup-vps.sh agent-project` (`infra/vps/java26/`). El script agrega el drop-in `/etc/systemd/system/agent-project.service.d/java26.conf`, que antepone JDK 26 al `PATH` del servicio; el `ExecStart` (`/usr/bin/env java -jar ...`) no cambia. El OpenJDK 21 del sistema sigue intacto para las demás apps.
 - nginx ya instalado y en uso (mismo que sirve `nolost` y los demás sitios).
 - DNS: `agent.srdejo.com.co` → IP del VPS (`207.38.88.222`), registro A creado por el usuario.
 - Certificado SSL: `sudo certbot --nginx -d agent.srdejo.com.co`.
@@ -24,11 +24,10 @@ Backend en **`127.0.0.1:8083`** (loopback, nginx hace proxy) — `nolost` ya ocu
 
 ```
 /home/srdejo/agent-project/
-├── app.jar              -> symlink a bootstrap-0.0.1-SNAPSHOT.jar
-├── bootstrap-0.0.1-SNAPSHOT.jar
+├── app.jar              -> symlink al jar desplegado (agent-project-backend.jar desde v2)
 ├── .env                  (chmod 600 — credenciales de DB)
 └── data/
-    └── inbox/            (progreso.json / nuevo.json, ver docs/SYNC_PROTOCOL.md)
+    └── inbox/            (snapshot.json, ver docs/SYNC_PROTOCOL.md)
 
 /home/srdejo/agent-project-frontend/
 └── ...                   build estático de Angular (contenido de dist/frontend/browser/, sin la carpeta "browser" anidada)
@@ -65,6 +64,8 @@ DB_NAME=agent_project
 DB_USER=agent_project
 DB_PASSWORD=<password-real>
 SYNC_INBOX_DIR=/home/srdejo/agent-project/data/inbox
+# R2DBC desde v2: el drop-in db-pool.conf (Hikari) ya no le aplica; este es su limite de conexiones.
+DB_POOL_MAX=3
 ```
 
 Instalación (ya hecha, dejar documentado para el próximo redeploy de cero):

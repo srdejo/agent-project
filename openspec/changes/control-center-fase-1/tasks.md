@@ -19,7 +19,7 @@
   - el sitio está protegido por oauth2-proxy (corrige "Sin módulo platform:security").
 
   Verificar: cada decisión tiene su motivo y su alternativa descartada, y `grep -n "oauth2-proxy" docs/DECISIONS.md docs/ARCHITECTURE.md` devuelve ambas.
-- [ ] 1.3 Redactar, para cada uno de los 11 repos del portafolio, un borrador de `## Objetivo actual` (nombre, criterio de cierre y alcance con referencias a etapas y cambios reales) y el mapeo de `priority` → `state` y `open_question` → `blockers` (design D7). Presentarlo a Daniel en `RESUMEN-DIARIO.md` para su aprobación. **No commitear en los repos sin su aprobación.** Verificar: Daniel aprueba o corrige cada uno, y los aprobados quedan commiteados en la rama de trabajo de cada repo.
+- [x] 1.3 Redactar, para cada uno de los 11 repos del portafolio, un borrador de `## Objetivo actual` (nombre, criterio de cierre y alcance con referencias a etapas y cambios reales) y el mapeo de `priority` → `state` y `open_question` → `blockers` (design D7). Presentarlo a Daniel en `RESUMEN-DIARIO.md` para su aprobación. **No commitear en los repos sin su aprobación.** Verificar: Daniel aprueba o corrige cada uno, y los aprobados quedan commiteados en la rama de trabajo de cada repo.
 
 ## 2. Contrato v2 y base del arquetipo
 
@@ -81,7 +81,7 @@
 - [x] 6.1 Reescribir `portfolio.py` para emitir `snapshot.json` v2 (design D4). Parsea el ROADMAP en crudo: etapas con clave, marcador, criterio y backlog; tareas con `checked`/`cancelled`/línea; `## Objetivo actual` y `## Objetivos cumplidos`. No calcula ningún porcentaje ni estado. Verificar con `unittest` sobre árboles temporales: objetivo con alcance, cumplidos, etapa backlog, tachado, `**Objetivo**:` de etapa que no se confunde con el objetivo, y un repo sin ROADMAP.
 - [x] 6.2 Escaneo de `openspec/` en `portfolio.py`: cambios activos con sus artefactos presentes (límite de 200 KB y `truncated`), `metadata`, tareas (número, texto, sección, línea, `checked`, `cancelled`, anidadas), `archived_count`, `specs_count`, `commands` desde `.claude/commands/opsx/`, `archived_in_scope` solo con las tareas, y `{name, error}` ante fallos de lectura. Verificar con `unittest`: artefacto ausente, truncado, error de lectura, tarea anidada, tarea sin número y cambio archivado referenciado.
 - [x] 6.3 Entrada con `error` de repo (sin abortar la corrida) y subida atómica de `snapshot.json` (`.tmp` + `mv`). Eliminar la generación de `progreso.json`/`nuevo.json`, `-Bump`, el cálculo de `last_modified` y los `events`. Verificar: un repo con el ROADMAP ilegible produce `{error}` y el resto se genera; `-DryRun` no sube nada.
-- [ ] 6.4 Migrar `portfolio.json` al mapeo aprobado en 1.3 (`state`, `blockers`, sin `priority`/`open_question`) con validación previa a la subida, y reescribir `infra/portfolio/README.md` (la rúbrica queda como "hechos que se reportan"; la regla de avance apunta al spec del backend). Verificar: `.\sync-portfolio.ps1 -DryRun` no muestra errores de validación.
+- [x] 6.4 Migrar `portfolio.json` al mapeo aprobado en 1.3 (`state`, `blockers`, sin `priority`/`open_question`) con validación previa a la subida, y reescribir `infra/portfolio/README.md` (la rúbrica queda como "hechos que se reportan"; la regla de avance apunta al spec del backend). Verificar: `.\sync-portfolio.ps1 -DryRun` no muestra errores de validación.
 - [x] 6.5 `.\sync-portfolio.ps1 -OnlyBuild` y medición del tamaño de `out/snapshot.json`. Verificar: ningún artefacto supera 200 KB y el tamaño total queda anotado en `docs/PROGRESS.md`.
 
 ## 7. Frontend reconstruido
@@ -94,7 +94,7 @@
 
 ## 8. Despliegue y cierre
 
-- [ ] 8.1 Prueba end-to-end local: `bootRun` + `npm start` con el `out/snapshot.json` real de 6.5 en el inbox. Verificar:
+- [x] 8.1 Prueba end-to-end local: `bootRun` + `npm start` con el `out/snapshot.json` real de 6.5 en el inbox. Verificar:
   - Mi trabajo muestra cambios reales de `nolost`/`visionarios`;
   - los proyectos con objetivo aprobado muestran su % con numerador y denominador;
   - la continuación se copia;
