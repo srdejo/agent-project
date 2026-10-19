@@ -11,7 +11,7 @@ Cómo está desplegado `agent-project` en `nolost-vps`. **Desplegado y verificad
   GRANT ALL PRIVILEGES ON DATABASE agent_project TO agent_project;
   ALTER DATABASE agent_project OWNER TO agent_project;
   ```
-- **JDK 26** (desde Control Center v2, arquetipo reactivo): Eclipse Temurin en `/opt/java/temurin-26`, instalado con `sudo bash ~/java26/setup-vps.sh agent-project` (`infra/vps/java26/`). El script agrega el drop-in `/etc/systemd/system/agent-project.service.d/java26.conf`, que antepone JDK 26 al `PATH` del servicio; el `ExecStart` (`/usr/bin/env java -jar ...`) no cambia. El OpenJDK 21 del sistema sigue intacto para las demás apps.
+- **JDK 26** (desde Control Center v2, arquetipo reactivo): el JDK estándar del VPS, `/home/srdejo/opt/jdk-26` (Temurin 26.0.2.1), el mismo que usan subscription-hub, perla-ai, recaudo y beauty. Como el unit arranca con `/usr/bin/env java -jar ...`, un drop-in (`/etc/systemd/system/agent-project.service.d/java26.conf`, instalado con `sudo bash ~/java26/setup-vps.sh agent-project`, ver `infra/vps/java26/`) antepone ese JDK al `PATH` del servicio. El OpenJDK 21 del sistema sigue intacto para las apps no migradas.
 - nginx ya instalado y en uso (mismo que sirve `nolost` y los demás sitios).
 - DNS: `agent.srdejo.com.co` → IP del VPS (`207.38.88.222`), registro A creado por el usuario.
 - Certificado SSL: `sudo certbot --nginx -d agent.srdejo.com.co`.
