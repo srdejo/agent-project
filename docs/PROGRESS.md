@@ -7,14 +7,18 @@ Estado del proyecto a **2026-08-19**. Actualizar este archivo cada vez que se ci
 **Control Center v2 en curso** (cambio OpenSpec `control-center-fase-1`, rama `claude/control-center-v2-2026-10-15` aquí y en el repo del workspace para `infra/`). Hecho y verificado en local:
 - **Backend reestructurado** sobre el arquetipo `powerup-arquetipo-rx` (Java 26, Boot 4.1, WebFlux, R2DBC), con el contrato de sync v2 y el avance medido contra el objetivo declarado en el ROADMAP. Tiene 77 tests en verde. `bootRun` aplicó V7 sobre la base local con datos V1–V6, y el WebSocket del agente, el log y Swagger están verificados.
 - **Generador v2** (`infra/portfolio/portfolio.py`), con 20 tests en verde.
+- **Frontend reconstruido** (Mi trabajo, portafolio, detalle de proyecto y detalle de cambio), con `npm run build` limpio. Verificado con Chrome headless contra el backend local y el snapshot real: sin overflow horizontal a 375 px en las 4 vistas, filtros conservados al recargar, aviso de datos obsoletos con `SYNC_STALE_AFTER=PT1M`, un artefacto con `<script>`/`onerror` mostrado como texto literal y "Copiar" conservando la edición. La extensión de Chrome no estaba conectada, así que no hubo verificación en el navegador de Daniel.
 
-Pendiente: los objetivos de cada repo (hay que aprobarlos), migrar `portfolio.json`, el frontend y el despliegue (JDK 26 en el VPS).
+Pendiente:
+1. Aprobar los objetivos de cada repo (tabla en `RESUMEN-DIARIO.md` del workspace) y luego migrar `portfolio.json` (tareas 1.3 y 6.4).
+2. Cerrar el end-to-end con objetivos reales (8.1).
+3. **Desplegar: necesita JDK 26 en `nolost-vps`**, que instala Daniel con `sudo` (8.2). La V7 borra las tablas de producción, así que antes hay que hacer un `pg_dump`.
 
 **Medición del snapshot real** (`.\sync-portfolio.ps1 -OnlyBuild`, 2026-10-15): 11 proyectos y 686 KB en total. Hay 54 artefactos OpenSpec: el mayor pesa 22 KB (`nolost/kids-registro-y-asistencia`) y ninguno se trunca. Por proyecto, el mayor es `nolost` con 238 KB. Hoy ningún ROADMAP declara `## Objetivo actual`.
 
 ## Tarea actual
 
-Grupo 1.3 (borradores de objetivo por repo, para aprobación de Daniel) y grupo 7 (frontend).
+Esperando la aprobación de los objetivos por repo (1.3) y la instalación de JDK 26 en el VPS (8.2). Todo lo demás del cambio `control-center-fase-1` está hecho y verificado en local.
 
 ## Completado
 
