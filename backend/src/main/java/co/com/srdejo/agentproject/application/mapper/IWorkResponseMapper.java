@@ -1,7 +1,9 @@
 package co.com.srdejo.agentproject.application.mapper;
 
+import co.com.srdejo.agentproject.application.dto.response.DailyResponseDto;
 import co.com.srdejo.agentproject.application.dto.response.SyncHealthResponseDto;
 import co.com.srdejo.agentproject.application.dto.response.WorkResponseDto;
+import co.com.srdejo.agentproject.domain.model.view.Daily;
 import co.com.srdejo.agentproject.domain.model.view.SyncHealth;
 import co.com.srdejo.agentproject.domain.model.view.Work;
 import org.mapstruct.Mapper;
@@ -15,4 +17,6 @@ public interface IWorkResponseMapper {
     WorkResponseDto toResponse(Work work);
 
     SyncHealthResponseDto toResponse(SyncHealth health);
+
+    DailyResponseDto toResponse(Daily daily);
 }

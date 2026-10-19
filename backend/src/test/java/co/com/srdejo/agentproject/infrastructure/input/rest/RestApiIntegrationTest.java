@@ -112,6 +112,24 @@ class RestApiIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void dailyFocusesOnTheObjectiveChangeAndCarriesTheFourSections() {
+        client.get().uri("/api/daily").exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.date").value(date -> org.assertj.core.api.Assertions.assertThat((String) date)
+                        .matches("\\d{4}-\\d{2}-\\d{2}"))
+                .jsonPath("$.focus.projectId").isEqualTo("nolost")
+                .jsonPath("$.focus.changeName").isEqualTo("kids")
+                .jsonPath("$.alternatives.length()").isEqualTo(0)
+                .jsonPath("$.needs[0].description").isEqualTo("Umbral de días")
+                .jsonPath("$.commands[4]").isEqualTo("/opsx:apply kids")
+                .jsonPath("$.stale").isBoolean()
+                .jsonPath("$.text").value(text -> org.assertj.core.api.Assertions.assertThat((String) text)
+                        .contains("Para hoy trabajaré en:", "Para trabajar necesito:", "Ejecuta en consola",
+                                "Para continuar:"));
+    }
+
+    @Test
     void syncHealthReportsDataAndAgentSeparately() {
         client.get().uri("/api/health/sync").exchange()
                 .expectStatus().isOk()

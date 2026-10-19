@@ -1,6 +1,7 @@
 package co.com.srdejo.agentproject.infrastructure.configuration;
 
 import co.com.srdejo.agentproject.domain.api.IContinuationServicePort;
+import co.com.srdejo.agentproject.domain.api.IDailyServicePort;
 import co.com.srdejo.agentproject.domain.api.IPortfolioServicePort;
 import co.com.srdejo.agentproject.domain.api.ISyncHealthServicePort;
 import co.com.srdejo.agentproject.domain.api.ISyncServicePort;
@@ -9,6 +10,7 @@ import co.com.srdejo.agentproject.domain.spi.IAgentPresencePort;
 import co.com.srdejo.agentproject.domain.spi.IProjectPersistencePort;
 import co.com.srdejo.agentproject.domain.spi.ISyncRunPersistencePort;
 import co.com.srdejo.agentproject.domain.usecase.ContinuationUseCase;
+import co.com.srdejo.agentproject.domain.usecase.DailyUseCase;
 import co.com.srdejo.agentproject.domain.usecase.PortfolioUseCase;
 import co.com.srdejo.agentproject.domain.usecase.SyncHealthUseCase;
 import co.com.srdejo.agentproject.domain.usecase.SyncSnapshotUseCase;
@@ -108,5 +110,11 @@ public class BeanConfiguration {
     @Bean
     public IWorkServicePort workServicePort() {
         return new WorkUseCase(projectPersistencePort(), syncRunPersistencePort());
+    }
+
+    @Bean
+    public IDailyServicePort dailyServicePort() {
+        return new DailyUseCase(workServicePort(), continuationServicePort(), syncHealthServicePort(),
+                projectPersistencePort(), clock());
     }
 }
