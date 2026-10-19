@@ -2,10 +2,11 @@ package co.com.srdejo.agentproject.infrastructure.input.inbox;
 
 import co.com.srdejo.agentproject.domain.api.ISyncServicePort;
 import co.com.srdejo.agentproject.domain.model.SyncRun;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -68,7 +69,12 @@ public class InboxSyncJob {
         this.inboxDir = Path.of(inboxDir);
     }
 
-    @PostConstruct
+    /**
+     * Starts only once the application is ready: Flyway runs during context refresh, and a snapshot already waiting in
+     * the inbox must not be processed against a schema that is still being migrated (it happened on the VPS, where
+     * startup takes ~25 s and the first pass ran before V7 created the tables).
+     */
+    @EventListener(ApplicationReadyEvent.class)
     public void start() {
         running = true;
         watchExecutor.submit(this::watchLoop);
