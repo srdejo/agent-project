@@ -8,6 +8,11 @@ Checkboxes `[x]` solo se marcan cuando la tarea fue **verificada en el código**
 
 ---
 
+## Objetivo actual: Control Center v2 en producción
+
+**Criterio de cierre**: Mi trabajo, el portafolio y el detalle de cambio cargan con datos reales en agent.srdejo.com.co.
+**Alcance**: openspec:control-center-fase-1
+
 ## Etapa 0 — Gobernanza del proyecto 🟢
 
 - [x] Crear `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/PROGRESS.md`.
