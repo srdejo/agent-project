@@ -29,3 +29,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Volcados de la base que descarga infra/deploy.ps1 -Action Backup: datos de produccion, nunca al repo.
+backups/
