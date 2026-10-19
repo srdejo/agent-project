@@ -1,0 +1,132 @@
+<main class="px-4 sm:px-6 md:px-10 pt-8 pb-16">
+  <div class="pb-6 border-b border-surface-border">
+    <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight leading-none">Portafolio</h1>
+    <p class="text-[13px] text-ink-muted mt-2.5 max-w-[70ch] leading-relaxed">
+      El avance principal es el del <strong class="font-medium text-ink">objetivo actual</strong> declarado en el ROADMAP
+      de cada repo: tareas completadas según el repo, sobre el total del alcance. El avance del ROADMAP completo va aparte.
+    </p>
+  </div>
+
+  <!-- Filtros y orden -->
+  <div class="flex flex-wrap items-end gap-x-5 gap-y-3 py-4 border-b border-surface-border font-mono text-[11px]">
+    <label class="flex flex-col gap-1">
+      <span class="text-ink-muted uppercase tracking-wide text-[10px]">Estado</span>
+      <select class="bg-surface-card border border-surface-border px-2 py-1" [value]="state()"
+              (change)="set('state', $any($event.target).value)">
+        <option value="">Todos</option>
+        @for (s of states; track s) { <option [value]="s" [selected]="s === state()">{{ stateLabel[s] }}</option> }
+      </select>
+    </label>
+    <label class="flex flex-col gap-1">
+      <span class="text-ink-muted uppercase tracking-wide text-[10px]">Stack</span>
+      <select class="bg-surface-card border border-surface-border px-2 py-1 max-w-[12rem]" [value]="stack()"
+              (change)="set('stack', $any($event.target).value)">
+        <option value="">Todos</option>
+        @for (s of stacks(); track s) { <option [value]="s" [selected]="s === stack()">{{ s }}</option> }
+      </select>
+    </label>
+    <label class="flex flex-col gap-1">
+      <span class="text-ink-muted uppercase tracking-wide text-[10px]">Orden</span>
+      <select class="bg-surface-card border border-surface-border px-2 py-1" [value]="sort()"
+              (change)="set('sort', $any($event.target).value === 'rank' ? '' : $any($event.target).value)">
+        <option value="rank" [selected]="sort() === 'rank'">Prioridad</option>
+        <option value="progress" [selected]="sort() === 'progress'">Avance del objetivo</option>
+        <option value="blockers" [selected]="sort() === 'blockers'">Bloqueos</option>
+        <option value="activity" [selected]="sort() === 'activity'">Última actividad</option>
+      </select>
+    </label>
+    <label class="flex items-center gap-1.5 py-1 cursor-pointer">
+      <input type="checkbox" [checked]="withBlockers()" (change)="set('blockers', $any($event.target).checked)" /> Con bloqueos
+    </label>
+    <label class="flex items-center gap-1.5 py-1 cursor-pointer">
+      <input type="checkbox" [checked]="actionable()" (change)="set('actionable', $any($event.target).checked)" /> Con trabajo ejecutable
+    </label>
+    <label class="flex items-center gap-1.5 py-1 cursor-pointer">
+      <input type="checkbox" [checked]="noObjective()" (change)="set('noObjective', $any($event.target).checked)" /> Sin objetivo
+    </label>
+    <button type="button" (click)="clear()" class="underline underline-offset-4 text-ink-muted hover:text-ink py-1">Limpiar</button>
+  </div>
+
+  @if (cards() === undefined) {
+    <p class="font-mono text-[12px] text-ink-muted py-10">Cargando el portafolio…</p>
+  } @else if (cards() === null) {
+    <p class="font-mono text-[12px] text-status-warn py-10">No se pudo cargar /api/portfolio.</p>
+  } @else {
+    <p class="font-mono text-[11px] text-ink-muted mt-4">{{ visible().length }} de {{ cards()!.length }} proyectos</p>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3">
+      @for (c of visible(); track c.id) {
+        <article class="border border-surface-border bg-surface-card p-4 flex flex-col gap-3 min-w-0">
+          <header class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <a [routerLink]="['/projects', c.id]" class="text-[16px] font-semibold tracking-tight hover:text-accent break-words">{{ c.name }}</a>
+              @if (c.alias) { <div class="text-[12px] text-ink-muted truncate">{{ c.alias }}</div> }
+            </div>
+            <div class="flex items-center gap-2 flex-none">
+              <span class="font-mono text-[10px] uppercase tracking-wide px-1.5 py-0.5" [class]="stateClass[c.state]">{{ stateLabel[c.state] }}</span>
+              <span class="font-mono text-[13px] font-semibold tabular-nums text-ink-faint" title="Posición en la prioridad">{{ c.priorityRank ?? '—' }}</span>
+            </div>
+          </header>
+
+          @if (c.summary) { <p class="text-[12px] text-ink-muted leading-relaxed line-clamp-2">{{ c.summary }}</p> }
+
+          <!-- Avance del objetivo -->
+          <div>
+            @if (c.objective; as o) {
+              <div class="flex items-baseline justify-between gap-3">
+                <span class="text-[12px] min-w-0 truncate" [title]="o.name">
+                  <span class="font-mono text-[10px] uppercase tracking-wide text-ink-muted mr-1">Objetivo</span>{{ o.name }}
+                </span>
+                @if (o.percent !== null) {
+                  <span class="font-mono text-[13px] font-semibold tabular-nums flex-none">{{ o.percent }}% <span class="text-ink-muted font-normal">({{ o.done }}/{{ o.total }})</span></span>
+                } @else {
+                  <span class="font-mono text-[12px] text-ink-muted flex-none">Sin datos</span>
+                }
+              </div>
+              @if (o.percent !== null) {
+                <div class="h-1.5 bg-surface-divider mt-1.5"><div class="h-1.5" [class.bg-status-ok]="!o.achieved" [class.bg-accent]="o.achieved" [style.width.%]="o.percent"></div></div>
+              }
+              @if (o.achieved) {
+                <p class="font-mono text-[10px] text-accent mt-1">Objetivo cumplido · declara el siguiente</p>
+              }
+            } @else {
+              <p class="text-[12px] text-status-warn">Sin objetivo declarado</p>
+            }
+            @if (c.roadmap; as r) {
+              <p class="font-mono text-[10px] text-ink-subtle mt-1.5">
+                Roadmap {{ r.percent === null ? 'sin datos' : r.percent + '%' }} ({{ r.done }}/{{ r.total }})
+                @if (c.activeChanges) { · {{ c.activeChanges }} cambio(s) OpenSpec }
+              </p>
+            } @else if (c.activeChanges) {
+              <p class="font-mono text-[10px] text-ink-subtle mt-1.5">Sin ROADMAP · {{ c.activeChanges }} cambio(s) OpenSpec</p>
+            }
+          </div>
+
+          @if (c.mainBlocker; as b) {
+            <p class="text-[12px] pl-3 border-l-2 border-status-warn break-words">
+              <span class="font-mono text-[10px] uppercase tracking-wide text-status-warn block">Bloqueo principal{{ c.blockerCount > 1 ? ' (de ' + c.blockerCount + ')' : '' }}</span>
+              {{ b.description }}
+            </p>
+          }
+          @if (c.readError) {
+            <p class="font-mono text-[10px] text-status-warn">Último sync no pudo leer el repo: {{ c.readError }}</p>
+          }
+          @if (c.missingSince) {
+            <p class="font-mono text-[10px] text-status-warn">No reportado desde {{ ageSince(c.missingSince) }}</p>
+          }
+
+          <footer class="flex items-center justify-between gap-3 mt-auto pt-1">
+            <span class="font-mono text-[10px] text-ink-subtle">Actividad {{ ageSince(c.lastActivity) }}</span>
+            @if (action(c); as a) {
+              <a [routerLink]="a.link" [queryParams]="a.query ?? null"
+                 class="font-mono text-[11px] text-accent hover:underline underline-offset-4 truncate">{{ a.label }} →</a>
+            }
+          </footer>
+        </article>
+      } @empty {
+        <p class="text-[13px] text-ink-muted border border-dashed border-surface-border px-4 py-6 lg:col-span-2">
+          Ningún proyecto con esos filtros.
+        </p>
+      }
+    </div>
+  }
+</main>

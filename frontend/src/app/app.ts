@@ -1,28 +1,9 @@
-import { DatePipe } from '@angular/common';
-import { Component, computed, effect, ElementRef, inject, ViewChild } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { ProjectApiService } from './core/services/project-api.service';
-import { AgentMonitorService } from './core/services/agent-monitor.service';
+import { Component } from '@angular/core';
+import { Shell } from './layout/shell';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet, DatePipe],
-  templateUrl: './app.html',
+  imports: [Shell],
+  template: '<app-shell />',
 })
-export class App {
-  @ViewChild('logsContainer') private logsContainer?: ElementRef<HTMLElement>;
-  private readonly api = inject(ProjectApiService);
-  readonly monitor = inject(AgentMonitorService);
-  private readonly scrollLogs = effect(() => {
-    this.monitor.logs();
-    queueMicrotask(() => {
-      const element = this.logsContainer?.nativeElement;
-      if (element) element.scrollTop = element.scrollHeight;
-    });
-  });
-
-  private readonly response = toSignal(this.api.list(), { initialValue: null });
-
-  readonly lastSync = computed(() => this.response()?.lastSync ?? null);
-}
+export class App {}

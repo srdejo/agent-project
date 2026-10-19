@@ -4,11 +4,17 @@ Estado del proyecto a **2026-08-19**. Actualizar este archivo cada vez que se ci
 
 ## Estado actual
 
-Etapa 7 — Monitoreo operativo del agente (🟡 implementado y compilado localmente; falta aplicar nginx/token en producción y validar el primer evento real).
+**Control Center v2 en curso** (cambio OpenSpec `control-center-fase-1`, rama `claude/control-center-v2-2026-10-15` aquí y en el repo del workspace para `infra/`). Hecho y verificado en local:
+- **Backend reestructurado** sobre el arquetipo `powerup-arquetipo-rx` (Java 26, Boot 4.1, WebFlux, R2DBC), con el contrato de sync v2 y el avance medido contra el objetivo declarado en el ROADMAP. Tiene 77 tests en verde. `bootRun` aplicó V7 sobre la base local con datos V1–V6, y el WebSocket del agente, el log y Swagger están verificados.
+- **Generador v2** (`infra/portfolio/portfolio.py`), con 20 tests en verde.
+
+Pendiente: los objetivos de cada repo (hay que aprobarlos), migrar `portfolio.json`, el frontend y el despliegue (JDK 26 en el VPS).
+
+**Medición del snapshot real** (`.\sync-portfolio.ps1 -OnlyBuild`, 2026-10-15): 11 proyectos y 686 KB en total. Hay 54 artefactos OpenSpec: el mayor pesa 22 KB (`nolost/kids-registro-y-asistencia`) y ninguno se trunca. Por proyecto, el mayor es `nolost` con 238 KB. Hoy ningún ROADMAP declara `## Objetivo actual`.
 
 ## Tarea actual
 
-WebSocket de presencia implementado en Spring Boot, daemon local Node.js con reconexión, y monitor global Angular con estado/logs en vivo.
+Grupo 1.3 (borradores de objetivo por repo, para aprobación de Daniel) y grupo 7 (frontend).
 
 ## Completado
 

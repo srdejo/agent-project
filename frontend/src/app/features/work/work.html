@@ -1,0 +1,173 @@
+<main class="px-4 sm:px-6 md:px-10 pt-8 pb-16">
+  <div class="pb-6 border-b border-surface-border">
+    <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight leading-none">Mi trabajo</h1>
+    <p class="text-[13px] text-ink-muted mt-2.5 max-w-[68ch] leading-relaxed">
+      Qué retomar, qué se puede avanzar ahora, qué decisión desbloquea más y qué necesita revisión.
+      Solo con datos que existen: los repos reportados en el último sync.
+    </p>
+  </div>
+
+  @switch (load().state) {
+    @case ('loading') {
+      <p class="font-mono text-[12px] text-ink-muted py-10">Cargando…</p>
+    }
+    @case ('error') {
+      <p class="font-mono text-[12px] text-status-warn py-10">No se pudo cargar /api/work. ¿Está el backend arriba?</p>
+    }
+  }
+
+  @if (load(); as l) {
+    @if (l.state === 'ready') {
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-x-10 gap-y-10 mt-8">
+
+        <!-- Continuar -->
+        <section aria-labelledby="h-continue" class="min-w-0">
+          <h2 id="h-continue" class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-3">Continuar</h2>
+          @for (c of l.work.continue; track c.projectId + c.changeName) {
+            <a [routerLink]="['/projects', c.projectId, 'changes', c.changeName]"
+               class="block border border-surface-border bg-surface-card px-4 py-3 mb-2 hover:border-ink-faint transition-colors">
+              <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <span class="text-[14px] font-semibold tracking-tight min-w-0 break-words">
+                  {{ c.projectName }} <span class="font-mono text-[12px] font-normal text-ink-muted">· {{ c.changeName }}</span>
+                </span>
+                <span class="font-mono text-[11px] tabular-nums text-ink-muted">{{ c.done }}/{{ c.total }}</span>
+              </div>
+              <div class="h-1 bg-surface-divider mt-2">
+                <div class="h-1 bg-status-ok" [style.width.%]="c.total ? (100 * c.done) / c.total : 0"></div>
+              </div>
+              <p class="text-[12px] text-ink mt-2 line-clamp-2">
+                <span class="font-mono text-[10px] uppercase tracking-wide text-ink-muted mr-1">Siguiente</span>
+                @if (c.nextNumber) { <span class="font-mono">{{ c.nextNumber }}</span> } {{ c.nextText }}
+              </p>
+              @if (c.inObjective) {
+                <span class="inline-block font-mono text-[10px] uppercase tracking-wide px-1.5 py-0.5 mt-2 bg-accent/10 text-accent">En el objetivo</span>
+              }
+            </a>
+          } @empty {
+            <p class="text-[13px] text-ink-muted border border-dashed border-surface-border px-4 py-4">
+              Ningún cambio OpenSpec a medias.
+            </p>
+          }
+        </section>
+
+        <!-- Decisiones que desbloquean -->
+        <section aria-labelledby="h-decisions" class="min-w-0">
+          <h2 id="h-decisions" class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-3">Decisiones que desbloquean</h2>
+          @for (d of l.work.decisions; track d.projectId + d.blockerId) {
+            <a [routerLink]="['/projects', d.projectId]" [queryParams]="{ tab: 'blockers' }"
+               class="block border-l-2 border-status-warn bg-surface-card px-4 py-3 mb-2 hover:bg-surface-divider/40 transition-colors">
+              <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <span class="font-mono text-[11px] text-ink-muted">{{ d.projectName }}</span>
+                <span class="font-mono text-[11px] text-status-warn">
+                  @if (d.openTasksAffected !== null) {
+                    {{ d.openTasksAffected }} tarea(s) abiertas afectadas
+                  } @else {
+                    afectados: sin datos
+                  }
+                </span>
+              </div>
+              <p class="text-[13px] text-ink mt-1 break-words">{{ d.description }}</p>
+              @if (d.owner) {
+                <p class="font-mono text-[10px] text-ink-subtle mt-1">Responsable: {{ d.owner }}</p>
+              }
+            </a>
+          } @empty {
+            <p class="text-[13px] text-ink-muted border border-dashed border-surface-border px-4 py-4">Sin decisiones pendientes.</p>
+          }
+        </section>
+
+        <!-- Accionables ahora -->
+        <section aria-labelledby="h-actionable" class="min-w-0 xl:col-span-2">
+          <h2 id="h-actionable" class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-3">Accionables ahora</h2>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
+            @for (g of l.work.actionable; track g.projectId) {
+              <div class="border border-surface-border bg-surface-card min-w-0">
+                <a [routerLink]="['/projects', g.projectId]"
+                   class="flex items-baseline justify-between gap-3 px-4 py-2.5 border-b border-surface-border hover:text-accent transition-colors">
+                  <span class="text-[14px] font-semibold tracking-tight">{{ g.projectName }}</span>
+                  @if (g.more > 0) {
+                    <span class="font-mono text-[10px] text-ink-muted">+{{ g.more }} más</span>
+                  }
+                </a>
+                <ul>
+                  @for (t of g.items; track t.taskId) {
+                    <li class="px-4 py-2 border-b border-surface-divider last:border-b-0 text-[12px]">
+                      <div class="flex items-baseline gap-2">
+                        <span class="font-mono text-[10px] uppercase tracking-wide flex-none"
+                              [class.text-accent]="t.status === 'IN_PROGRESS'" [class.text-ink-subtle]="t.status === 'OPEN'">
+                          {{ t.status === 'IN_PROGRESS' ? 'en curso' : 'pendiente' }}
+                        </span>
+                        <button type="button" (click)="toggle('a' + t.taskId)"
+                                class="text-left min-w-0 break-words hover:text-ink"
+                                [class.line-clamp-2]="!isExpanded('a' + t.taskId)"
+                                [attr.aria-expanded]="isExpanded('a' + t.taskId)">
+                          @if (t.number) { <span class="font-mono">{{ t.number }}</span> } {{ t.text }}
+                        </button>
+                      </div>
+                      <div class="font-mono text-[10px] text-ink-subtle mt-0.5 pl-[4.5rem] truncate">
+                        @if (t.changeName) {
+                          <a [routerLink]="['/projects', g.projectId, 'changes', t.changeName]" class="hover:text-ink">openspec · {{ t.changeName }}</a>
+                        } @else {
+                          ROADMAP
+                        }
+                        @if (t.inObjective) { · <span class="text-accent">objetivo</span> }
+                      </div>
+                    </li>
+                  }
+                </ul>
+              </div>
+            } @empty {
+              <p class="text-[13px] text-ink-muted border border-dashed border-surface-border px-4 py-4">
+                Nada accionable: todo está hecho, bloqueado o en proyectos pausados.
+              </p>
+            }
+          </div>
+        </section>
+
+        <!-- Revision requerida -->
+        <section aria-labelledby="h-review" class="min-w-0">
+          <h2 id="h-review" class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-3">Revisión requerida</h2>
+          <ul class="border border-surface-border bg-surface-card">
+            @for (r of l.work.review; track r.kind + r.projectId + (r.changeName ?? '')) {
+              <li class="border-b border-surface-divider last:border-b-0">
+                <a [routerLink]="r.changeName ? ['/projects', r.projectId, 'changes', r.changeName] : ['/projects', r.projectId]"
+                   class="block px-4 py-2.5 hover:bg-surface-divider/40 transition-colors">
+                  <div class="flex flex-wrap items-baseline gap-x-2">
+                    <span class="font-mono text-[10px] uppercase tracking-wide"
+                          [class.text-status-ok]="r.kind === 'CHANGE_COMPLETE' || r.kind === 'OBJECTIVE_ACHIEVED'"
+                          [class.text-status-warn]="r.kind !== 'CHANGE_COMPLETE' && r.kind !== 'OBJECTIVE_ACHIEVED'">
+                      {{ reviewLabel[r.kind] }}
+                    </span>
+                    <span class="text-[13px] font-medium">{{ r.projectName }}@if (r.changeName) {<span class="font-mono text-[12px] font-normal text-ink-muted"> · {{ r.changeName }}</span>}</span>
+                  </div>
+                  <p class="text-[12px] text-ink-muted mt-0.5 break-words">{{ r.message }}</p>
+                </a>
+              </li>
+            } @empty {
+              <li class="text-[13px] text-ink-muted px-4 py-4">Nada que revisar.</li>
+            }
+          </ul>
+        </section>
+
+        <!-- Actividad reciente -->
+        <section aria-labelledby="h-activity" class="min-w-0">
+          <h2 id="h-activity" class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-3">Actividad reciente</h2>
+          <ul class="border border-surface-border bg-surface-card font-mono text-[11px]">
+            @for (a of l.work.activity; track a.at + a.text) {
+              <li class="grid grid-cols-[86px_minmax(0,1fr)] gap-3 px-4 py-2 border-b border-surface-divider last:border-b-0">
+                <span class="text-ink-subtle">{{ a.at | date: 'dd MMM HH:mm' }}</span>
+                @if (a.projectId) {
+                  <a [routerLink]="['/projects', a.projectId]" class="text-ink break-words hover:text-accent">{{ a.text }}</a>
+                } @else {
+                  <span class="break-words" [class.text-status-warn]="a.text.startsWith('Sync fallido')">{{ a.text }}</span>
+                }
+              </li>
+            } @empty {
+              <li class="text-ink-muted px-4 py-4">Sin actividad todavía.</li>
+            }
+          </ul>
+        </section>
+      </div>
+    }
+  }
+</main>

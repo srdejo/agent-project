@@ -113,7 +113,23 @@ Un id inexistente responde 404 con `{"message": …}`.
 
 ## Frontend
 
-Angular 22, standalone components, sin `NgModule`, Tailwind CSS (paleta del mockup "OpenClaw Control Center"). **Pendiente de reconstruir** (grupo 7 del cambio `control-center-fase-1`): las vistas actuales (`features/projects`, `features/portfolio`) consumen la API anterior (`GET /api/projects`), que ya no existe en este backend. Solo el monitor del agente (`features/agent`) sigue siendo compatible.
+Angular 22, standalone components, sin `NgModule`, signals, Tailwind CSS (paleta del mockup "OpenClaw Control Center").
+
+```
+frontend/src/app/
+  core/models/        project.ts, change.ts, work.ts, health.ts (contratos de la API)
+  core/services/      portfolio-api.service.ts (todos los GET), sync-health.service.ts (cada 60 s),
+                      agent-monitor.service.ts (WebSocket /ws/agent, solo lectura)
+  layout/shell.ts     cabecera: navegación, antigüedad de los datos, estado del agente y aviso de datos obsoletos
+  shared/labels.ts    etiquetas de estado/tarea/bloqueo y formato de antigüedad
+  features/work/      "Mi trabajo" (ruta /)
+  features/portfolio/ portafolio con filtros y orden en la URL (/portfolio)
+  features/project/   detalle por pestañas: resumen, objetivo y tareas, cambios, bloqueos, actividad (/projects/:id)
+  features/change/    artefactos como texto literal y la instrucción de continuación para copiar (/projects/:id/changes/:name)
+  features/agent/     monitor del agente (/agent)
+```
+
+Los artefactos OpenSpec se muestran siempre por interpolación dentro de `<pre>`, nunca con `innerHTML`: son Markdown no confiable. La vista de cambio no tiene botones para ejecutar ni para enviar: solo permite copiar.
 
 ## Cómo correrlo
 

@@ -1,0 +1,285 @@
+<main class="px-4 sm:px-6 md:px-10 pt-8 pb-16">
+  @switch (load().state) {
+    @case ('loading') { <p class="font-mono text-[12px] text-ink-muted py-10">Cargando…</p> }
+    @case ('missing') {
+      <p class="font-mono text-[12px] text-status-warn py-10">Este proyecto no existe. <a routerLink="/portfolio" class="underline">Volver al portafolio</a></p>
+    }
+  }
+
+  @if (load(); as l) {
+    @if (l.state === 'ready') {
+      @let p = l.project;
+      @let c = p.card;
+
+      <!-- Cabecera -->
+      <div class="pb-5 border-b border-surface-border">
+        <a routerLink="/portfolio" class="font-mono text-[10px] text-ink-muted hover:text-ink uppercase tracking-wide">← Portafolio</a>
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
+          <h1 class="text-2xl sm:text-4xl font-semibold tracking-tight break-words">{{ c.name }}</h1>
+          <span class="font-mono text-[10px] uppercase tracking-wide px-1.5 py-0.5" [class]="stateClass[c.state]">{{ stateLabel[c.state] }}</span>
+        </div>
+        @if (c.alias) { <p class="text-[13px] text-ink-muted mt-1">{{ c.alias }}</p> }
+        <p class="font-mono text-[11px] text-ink-subtle mt-2 flex flex-wrap gap-x-3 gap-y-1">
+          <span>prioridad {{ c.priorityRank ?? '—' }}</span>
+          @if (p.sourceCommit) { <span>commit {{ p.sourceCommit }}</span> }
+          <span>actividad {{ ageSince(c.lastActivity) }}</span>
+        </p>
+        @if (c.readError) {
+          <p class="text-[12px] text-status-warn mt-2">El último sync no pudo leer el repo ({{ c.readErrorAt | date: 'dd MMM HH:mm' }}): {{ c.readError }}. Se muestra el último estado válido.</p>
+        }
+        @if (c.missingSince) {
+          <p class="text-[12px] text-status-warn mt-2">No reportado por el sync desde {{ c.missingSince | date: 'dd MMM y HH:mm' }}.</p>
+        }
+      </div>
+
+      <!-- Pestañas -->
+      <nav class="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-surface-border font-mono text-[11px] uppercase tracking-wide" role="tablist">
+        @for (t of tabs; track t.id) {
+          <button type="button" role="tab" [attr.aria-selected]="tab() === t.id" (click)="select(t.id)"
+                  class="px-3 py-2.5 whitespace-nowrap border-b-2 -mb-px transition-colors"
+                  [class.border-ink]="tab() === t.id" [class.text-ink]="tab() === t.id"
+                  [class.border-transparent]="tab() !== t.id" [class.text-ink-muted]="tab() !== t.id">
+            {{ t.label }}
+            @if (t.id === 'blockers' && p.blockers.length) { ({{ p.blockers.length }}) }
+            @if (t.id === 'changes' && c.activeChanges) { ({{ c.activeChanges }}) }
+          </button>
+        }
+      </nav>
+
+      <div class="pt-6">
+        @switch (tab()) {
+          <!-- Resumen -->
+          @case ('summary') {
+            <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-8">
+              <div class="min-w-0">
+                @if (c.summary) { <p class="text-[14px] leading-relaxed">{{ c.summary }}</p> }
+                @if (p.objective; as o) {
+                  <div class="border border-surface-border bg-surface-card p-4 mt-5">
+                    <div class="font-mono text-[10px] uppercase tracking-wide text-ink-muted">Objetivo actual</div>
+                    <div class="text-[18px] font-semibold tracking-tight mt-1">{{ o.name }}</div>
+                    @if (o.criteria) { <p class="text-[13px] text-ink-muted mt-1">{{ o.criteria }}</p> }
+                    <div class="flex items-baseline gap-3 mt-3">
+                      @if (o.percent !== null) {
+                        <span class="text-3xl sm:text-4xl font-semibold tabular-nums">{{ o.percent }}%</span>
+                        <span class="font-mono text-[12px] text-ink-muted">{{ o.done }}/{{ o.total }} completadas según el repo</span>
+                      } @else {
+                        <span class="text-xl font-semibold text-ink-muted">Sin datos</span>
+                        <span class="font-mono text-[12px] text-ink-muted">el alcance no tiene tareas que contar</span>
+                      }
+                    </div>
+                    <p class="font-mono text-[10px] text-ink-subtle mt-1">Evidencia independiente: no disponible</p>
+                    @if (o.achieved) { <p class="text-[12px] text-accent mt-2">Objetivo cumplido · declara el siguiente en el ROADMAP.</p> }
+                    @if (o.targetDate) { <p class="font-mono text-[11px] text-ink-muted mt-2">Fecha objetivo {{ o.targetDate }}</p> }
+                  </div>
+                } @else {
+                  <div class="border border-dashed border-status-warn/60 p-4 mt-5">
+                    <p class="text-[14px] font-semibold text-status-warn">Sin objetivo declarado</p>
+                    <p class="text-[12px] text-ink-muted mt-1">El avance principal no se puede medir. Ver la pestaña "Objetivo y tareas" para declararlo.</p>
+                  </div>
+                }
+                @if (c.roadmap; as r) {
+                  <p class="font-mono text-[11px] text-ink-muted mt-3">Roadmap completo: {{ r.percent === null ? 'sin datos' : r.percent + '%' }} ({{ r.done }}/{{ r.total }}) · dato secundario</p>
+                }
+                @if (c.stack.length) {
+                  <div class="flex flex-wrap gap-1.5 mt-5">
+                    @for (s of c.stack; track s) { <span class="font-mono text-[10px] px-1.5 py-0.5 bg-surface-divider text-ink-muted">{{ s }}</span> }
+                  </div>
+                }
+              </div>
+              <aside class="min-w-0">
+                <div class="font-mono text-[10px] uppercase tracking-wide text-ink-muted mb-2">Avance del objetivo en el tiempo</div>
+                @if (chart(p); as ch) {
+                  <svg viewBox="0 0 300 80" class="w-full h-24 bg-surface-card border border-surface-border" role="img"
+                       [attr.aria-label]="'Avance del objetivo: ' + ch.last.toFixed(0) + '%'">
+                    <line x1="0" y1="2" x2="300" y2="2" class="stroke-surface-divider" stroke-width="1" />
+                    <polyline [attr.points]="ch.points" fill="none" stroke="#2F7D5A" stroke-width="2" vector-effect="non-scaling-stroke" />
+                  </svg>
+                  <p class="font-mono text-[10px] text-ink-subtle mt-1">{{ p.history.length }} punto(s) · desde {{ p.history[0].takenAt | date: 'dd MMM y' }}</p>
+                } @else {
+                  <p class="text-[12px] text-ink-muted">Sin historial todavía.</p>
+                }
+                @if (c.mainBlocker; as b) {
+                  <div class="mt-6 pl-3 border-l-2 border-status-warn">
+                    <div class="font-mono text-[10px] uppercase tracking-wide text-status-warn">{{ blockerLabel[b.type] }}</div>
+                    <p class="text-[13px] mt-0.5">{{ b.description }}</p>
+                  </div>
+                }
+              </aside>
+            </div>
+          }
+
+          <!-- Objetivo y tareas -->
+          @case ('objective') {
+            @if (p.objective; as o) {
+              <div class="flex flex-wrap items-baseline justify-between gap-3">
+                <h2 class="text-[18px] font-semibold tracking-tight">{{ o.name }}</h2>
+                <span class="font-mono text-[12px]">
+                  {{ o.percent === null ? 'Sin datos' : o.percent + '%' }} · {{ o.done }}/{{ o.total }} completadas según el repo
+                </span>
+              </div>
+              <p class="font-mono text-[10px] text-ink-subtle mt-1">Evidencia independiente: no disponible</p>
+              <div class="flex flex-wrap gap-1.5 mt-3">
+                <span class="font-mono text-[10px] uppercase tracking-wide text-ink-muted mr-1 py-0.5">Alcance</span>
+                @for (s of o.scope; track s.ref) {
+                  <span class="font-mono text-[11px] px-1.5 py-0.5" [class.bg-surface-divider]="s.resolved"
+                        [class.bg-status-warn/10]="!s.resolved" [class.text-status-warn]="!s.resolved"
+                        [title]="s.resolved ? '' : 'Referencia no encontrada en el repo'">
+                    {{ s.ref }}@if (!s.resolved) { · no encontrada }
+                  </span>
+                }
+              </div>
+              @for (s of o.scope; track s.ref) {
+                @if (!s.resolved) {
+                  <p class="text-[12px] text-status-warn mt-2">Referencia no encontrada: {{ s.ref }}. No aporta tareas al avance.</p>
+                }
+              }
+              @for (g of o.groups; track g.kind + g.label) {
+                <section class="mt-6">
+                  <h3 class="flex items-baseline justify-between gap-3 border-b border-surface-border pb-1.5">
+                    <span class="text-[14px] font-semibold min-w-0 break-words">
+                      <span class="font-mono text-[10px] uppercase tracking-wide text-ink-muted mr-1">{{ g.kind === 'CHANGE' ? 'openspec' : 'roadmap' }}</span>{{ g.label }}
+                    </span>
+                    <span class="font-mono text-[11px] text-ink-muted flex-none">{{ g.done }}/{{ g.total }}</span>
+                  </h3>
+                  <ul>
+                    @for (t of g.tasks; track t.id) {
+                      <li class="grid grid-cols-[88px_minmax(0,1fr)] gap-3 py-1.5 border-b border-surface-divider text-[12px]">
+                        <span class="font-mono text-[10px] uppercase tracking-wide pt-0.5" [class]="taskClass[t.status]">{{ taskLabel[t.status] }}</span>
+                        <span class="break-words" [class.line-through]="t.status === 'CANCELLED'" [class.text-ink-subtle]="t.status === 'CANCELLED'">
+                          @if (t.number) { <span class="font-mono">{{ t.number }}</span> } {{ t.text }}
+                          @if (t.blockedReason) { <span class="font-mono text-[10px] text-status-warn"> · {{ t.blockedReason }}</span> }
+                          @if (t.heldByBlocker) { <span class="font-mono text-[10px] text-status-warn"> · bloqueada por {{ t.heldByBlocker }}</span> }
+                        </span>
+                      </li>
+                    }
+                  </ul>
+                  @if (g.kind === 'CHANGE') {
+                    <a [routerLink]="['/projects', c.id, 'changes', g.label]" class="font-mono text-[11px] text-accent hover:underline mt-2 inline-block">Abrir el cambio →</a>
+                  }
+                </section>
+              }
+            } @else {
+              <div class="max-w-[72ch]">
+                <h2 class="text-[18px] font-semibold tracking-tight text-status-warn">Sin objetivo declarado</h2>
+                <p class="text-[13px] text-ink-muted mt-2 leading-relaxed">
+                  Sin objetivo, el avance principal no se puede medir. Agrega esta sección al <span class="font-mono">docs/ROADMAP.md</span>
+                  del repo y corre el sync; el formato completo está en el <span class="font-mono">README.md</span> de agent-project.
+                </p>
+                <pre class="font-mono text-[12px] bg-surface-card border border-surface-border p-4 mt-3 whitespace-pre-wrap">{{ objectiveTemplate }}</pre>
+              </div>
+            }
+
+            @if (p.achievedObjectives.length) {
+              <section class="mt-8">
+                <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-2">Objetivos cumplidos</h3>
+                <ul class="text-[12px]">
+                  @for (a of p.achievedObjectives; track a.name) {
+                    <li class="py-1"><span class="font-mono text-ink-muted mr-2">{{ a.date }}</span><strong class="font-medium">{{ a.name }}</strong>@if (a.criteria) {: {{ a.criteria }}}</li>
+                  }
+                </ul>
+              </section>
+            }
+
+            @if (stagesOutsideObjective(p); as rest) {
+              @if (rest.length) {
+                <details class="mt-8 border border-surface-border bg-surface-card">
+                  <summary class="cursor-pointer px-4 py-2.5 font-mono text-[11px] uppercase tracking-wide text-ink-muted">
+                    Roadmap fuera del objetivo ({{ rest.length }} etapas)
+                  </summary>
+                  @for (s of rest; track s.title) {
+                    <div class="px-4 py-2 border-t border-surface-divider">
+                      <div class="flex items-baseline justify-between gap-3 text-[13px]">
+                        <span class="font-medium min-w-0 break-words">{{ s.title }}</span>
+                        <span class="font-mono text-[11px] text-ink-muted flex-none">{{ s.done }}/{{ s.total }}</span>
+                      </div>
+                      @for (t of s.tasks; track t.id) {
+                        <div class="grid grid-cols-[88px_minmax(0,1fr)] gap-3 py-1 text-[12px]">
+                          <span class="font-mono text-[10px] uppercase tracking-wide" [class]="taskClass[t.status]">{{ taskLabel[t.status] }}</span>
+                          <span class="break-words">{{ t.text }}@if (t.blockedReason) { <span class="font-mono text-[10px] text-status-warn"> · {{ t.blockedReason }}</span> }</span>
+                        </div>
+                      }
+                    </div>
+                  }
+                </details>
+              }
+            }
+          }
+
+          <!-- Cambios OpenSpec -->
+          @case ('changes') {
+            @if (l.changes; as ch) {
+              @if (!ch.openspecDetected) {
+                <p class="text-[13px] text-ink-muted">Este repo no usa OpenSpec.</p>
+              } @else {
+                <p class="font-mono text-[11px] text-ink-muted">
+                  {{ ch.archivedCount }} archivados · {{ ch.specsCount }} specs ·
+                  comandos: {{ ch.commands.length ? ch.commands.join(', ') : 'ninguno instalado' }}
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                  @for (x of ch.changes; track x.name) {
+                    @if (!x.archived) {
+                      <a [routerLink]="['/projects', c.id, 'changes', x.name]"
+                         class="block border border-surface-border bg-surface-card p-4 hover:border-ink-faint transition-colors min-w-0">
+                        <div class="flex items-baseline justify-between gap-3">
+                          <span class="font-mono text-[13px] font-medium break-all">{{ x.name }}</span>
+                          <span class="font-mono text-[11px] text-ink-muted flex-none">{{ x.done }}/{{ x.total }}</span>
+                        </div>
+                        <p class="font-mono text-[10px] text-ink-subtle mt-1.5 break-words">{{ x.artifacts.join(' · ') || 'sin artefactos' }}</p>
+                        @if (x.inObjective) { <span class="inline-block font-mono text-[10px] uppercase px-1.5 py-0.5 mt-2 bg-accent/10 text-accent">En el objetivo</span> }
+                        @if (x.parseError) { <p class="text-[11px] text-status-warn mt-2">Ilegible en el último sync: {{ x.parseError }}</p> }
+                      </a>
+                    }
+                  } @empty {
+                    <p class="text-[13px] text-ink-muted">Sin cambios activos.</p>
+                  }
+                </div>
+              }
+            } @else {
+              <p class="font-mono text-[12px] text-status-warn">No se pudieron cargar los cambios.</p>
+            }
+          }
+
+          <!-- Bloqueos y decisiones -->
+          @case ('blockers') {
+            @for (g of blockersByType(p.blockers); track g.type) {
+              <section class="mb-6">
+                <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-2">{{ blockerLabel[g.type] }}</h3>
+                @for (b of g.items; track b.id) {
+                  <div class="border border-surface-border bg-surface-card p-4 mb-2">
+                    <p class="text-[14px] font-medium break-words">{{ b.description }}</p>
+                    @if (b.impact) { <p class="text-[12px] text-ink-muted mt-1">Impacto: {{ b.impact }}</p> }
+                    <dl class="grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 gap-y-1 font-mono text-[11px] mt-3">
+                      <dt class="text-ink-muted">Afecta</dt>
+                      <dd class="break-words">{{ b.affects.length ? b.affects.join(', ') : '—' }}
+                        · {{ b.openTasksAffected === null ? 'tareas afectadas: sin datos' : b.openTasksAffected + ' tarea(s) abiertas' }}</dd>
+                      @if (b.owner) { <dt class="text-ink-muted">Responsable</dt><dd>{{ b.owner }}</dd> }
+                      @if (b.created) { <dt class="text-ink-muted">Desde</dt><dd>{{ b.created }}</dd> }
+                      @if (b.resolution) { <dt class="text-ink-muted">Se resuelve si</dt><dd class="break-words">{{ b.resolution }}</dd> }
+                    </dl>
+                  </div>
+                }
+              </section>
+            } @empty {
+              <p class="text-[13px] text-ink-muted">Sin bloqueos ni decisiones pendientes declarados.</p>
+            }
+          }
+
+          <!-- Actividad -->
+          @case ('activity') {
+            <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-2">Historial del objetivo actual</h3>
+            <ul class="border border-surface-border bg-surface-card font-mono text-[11px]">
+              @for (h of p.history.slice().reverse(); track h.takenAt) {
+                <li class="grid grid-cols-[140px_minmax(0,1fr)] gap-3 px-4 py-2 border-b border-surface-divider last:border-b-0">
+                  <span class="text-ink-subtle">{{ h.takenAt | date: 'dd MMM y HH:mm' }}</span>
+                  <span>{{ h.done }}/{{ h.total }} completadas</span>
+                </li>
+              } @empty {
+                <li class="px-4 py-4 text-ink-muted">Sin historial: el proyecto no tiene objetivo o no ha cambiado desde que lo tiene.</li>
+              }
+            </ul>
+          }
+        }
+      </div>
+    }
+  }
+</main>

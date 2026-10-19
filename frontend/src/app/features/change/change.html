@@ -1,0 +1,107 @@
+<main class="px-4 sm:px-6 md:px-10 pt-8 pb-16">
+  @switch (load().state) {
+    @case ('loading') { <p class="font-mono text-[12px] text-ink-muted py-10">Cargando…</p> }
+    @case ('missing') {
+      <p class="font-mono text-[12px] text-status-warn py-10">Este cambio no existe. <a routerLink="/portfolio" class="underline">Volver al portafolio</a></p>
+    }
+  }
+
+  @if (load(); as l) {
+    @if (l.state === 'ready') {
+      @let ch = l.change;
+
+      <div class="pb-5 border-b border-surface-border">
+        <a [routerLink]="['/projects', ch.projectId]" [queryParams]="{ tab: 'changes' }"
+           class="font-mono text-[10px] text-ink-muted hover:text-ink uppercase tracking-wide">← {{ ch.projectName }}</a>
+        <h1 class="font-mono text-xl sm:text-2xl font-semibold tracking-tight mt-2 break-all">{{ ch.name }}</h1>
+        <p class="font-mono text-[11px] text-ink-subtle mt-1 break-all">{{ ch.repo }}/{{ ch.path }}</p>
+        <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-3">
+          <span class="text-[15px] font-semibold tabular-nums">{{ ch.done }}/{{ ch.total }} marcadas en tasks.md</span>
+          <span class="font-mono text-[11px] text-ink-muted">Verificación: sin evidencia registrada</span>
+          @if (ch.inObjective) { <span class="font-mono text-[10px] uppercase px-1.5 py-0.5 bg-accent/10 text-accent">En el objetivo</span> }
+        </div>
+        @if (ch.parseError) {
+          <p class="text-[12px] text-status-warn mt-2">
+            El último sync no pudo leer este cambio ({{ ch.parseErrorAt | date: 'dd MMM HH:mm' }}): {{ ch.parseError }}.
+            @if (ch.lastParsedAt) { Se muestra la lectura correcta del {{ ch.lastParsedAt | date: 'dd MMM y HH:mm' }}. }
+          </p>
+        }
+      </div>
+
+      <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-8 pt-6">
+        <!-- Artefactos -->
+        <section class="min-w-0" aria-label="Artefactos">
+          @if (tabs().length) {
+            <nav class="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-surface-border font-mono text-[11px]" role="tablist">
+              @for (t of tabs(); track t.id) {
+                <button type="button" role="tab" (click)="selected.set(t.id)" [attr.aria-selected]="current()?.id === t.id"
+                        class="px-3 py-2 whitespace-nowrap border-b-2 -mb-px"
+                        [class.border-ink]="current()?.id === t.id" [class.border-transparent]="current()?.id !== t.id"
+                        [class.text-ink-muted]="current()?.id !== t.id">{{ t.label }}</button>
+              }
+            </nav>
+            @for (m of missing(); track m) {
+              <p class="font-mono text-[10px] text-ink-subtle mt-2">{{ m }} no existe en este cambio.</p>
+            }
+            @if (current(); as t) {
+              @if (t.artifact.truncated) {
+                <p class="text-[12px] text-status-warn mt-3">Contenido incompleto: el artefacto supera 200 KB y el sync lo truncó.</p>
+              }
+              <!-- Interpolated text only: artifacts are untrusted Markdown and never reach the DOM as HTML. -->
+              <pre class="font-mono text-[12px] leading-relaxed whitespace-pre-wrap break-words bg-surface-card border border-surface-border p-4 mt-3 max-h-[70vh] overflow-auto">{{ t.artifact.content }}</pre>
+            }
+          } @else {
+            <p class="text-[13px] text-ink-muted">Sin artefactos guardados para este cambio.</p>
+          }
+
+          <h2 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mt-8 mb-2">Tareas</h2>
+          <ul class="border border-surface-border bg-surface-card">
+            @for (t of ch.tasks; track t.id) {
+              <li class="grid grid-cols-[88px_minmax(0,1fr)] gap-3 px-4 py-1.5 border-b border-surface-divider last:border-b-0 text-[12px]">
+                <span class="font-mono text-[10px] uppercase tracking-wide pt-0.5" [class]="taskClass[t.status]">{{ t.status === 'DONE' ? 'Marcada' : taskLabel[t.status] }}</span>
+                <span class="break-words">@if (t.number) { <span class="font-mono">{{ t.number }}</span> } {{ t.text }}</span>
+              </li>
+            } @empty {
+              <li class="px-4 py-4 text-[13px] text-ink-muted">tasks.md sin checkboxes.</li>
+            }
+          </ul>
+        </section>
+
+        <!-- Continuacion -->
+        <aside class="min-w-0" aria-labelledby="h-continuation">
+          <div class="xl:sticky xl:top-4 border border-surface-border bg-surface-card p-4">
+            <h2 id="h-continuation" class="font-mono text-[11px] uppercase tracking-wider text-ink-muted">Instrucción para continuar</h2>
+            <p class="text-[12px] text-ink-muted mt-1 leading-relaxed">
+              Generada con los datos del último sync. Edítala si hace falta y cópiala en tu sesión del agente:
+              desde aquí no se ejecuta nada.
+            </p>
+            @if (!agentOnline()) {
+              <p class="font-mono text-[10px] text-status-warn mt-2">El agente está desconectado: copia la instrucción y pégala tú.</p>
+            }
+            @if (l.continuation; as cont) {
+              @if (cont.stale) {
+                <p class="font-mono text-[10px] text-status-warn mt-2">Datos obsoletos: confirma el estado en el repo antes de seguir.</p>
+              }
+              @if (cont.suggestedCommand) {
+                <p class="font-mono text-[11px] mt-3">Comando sugerido: <span class="bg-surface-divider px-1.5 py-0.5">{{ cont.suggestedCommand }}</span></p>
+              }
+              <label class="sr-only" for="continuation-text">Instrucción editable</label>
+              <textarea id="continuation-text" rows="18" [value]="draft()" (input)="draft.set($any($event.target).value)"
+                        class="w-full mt-3 font-mono text-[11px] leading-relaxed bg-surface-bg border border-surface-border p-3 resize-y"></textarea>
+              <div class="flex items-center gap-3 mt-2">
+                <button type="button" (click)="copy()"
+                        class="font-mono text-[11px] uppercase tracking-wide px-3 py-1.5 bg-ink text-surface-bg hover:bg-ink/85">Copiar</button>
+                <span class="font-mono text-[11px]" aria-live="polite">
+                  @if (copied() === 'ok') { <span class="text-status-ok">Copiado</span> }
+                  @if (copied() === 'error') { <span class="text-status-warn">No se pudo copiar: selecciona el texto y cópialo a mano</span> }
+                </span>
+              </div>
+            } @else {
+              <p class="font-mono text-[12px] text-status-warn mt-3">No se pudo generar la instrucción.</p>
+            }
+          </div>
+        </aside>
+      </div>
+    }
+  }
+</main>
