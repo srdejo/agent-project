@@ -99,7 +99,7 @@
   - los proyectos con objetivo aprobado muestran su % con numerador y denominador;
   - la continuación se copia;
   - `/api/health/sync` responde `stale=false`.
-- [ ] 8.2 En el VPS:
+- [x] 8.2 En el VPS:
   - JDK 26 instalado (lo hace Daniel con `sudo`) y el `ExecStart` del unit `agent-project.service` apuntando a él (`docs/DEPLOYMENT.md` actualizado);
   - `pg_dump agent_project` guardado con fecha;
   - despliegue del backend (`infra/deploy.ps1`) y `GET /api/health/sync` sin runs;
@@ -107,4 +107,4 @@
   - despliegue del frontend.
 
   Verificar en `https://agent.srdejo.com.co` (con el login de oauth2-proxy): Mi trabajo, portafolio, un detalle de proyecto y un detalle de cambio cargan con datos reales, y el monitor del agente sigue recibiendo eventos.
-- [ ] 8.3 Actualizar `docs/ROADMAP.md` (nueva etapa "Control Center v2 — Fase 0–1", con su propio `## Objetivo actual` para que agent-project use el estándar desde el primer día) y `docs/PROGRESS.md` (estado y siguiente paso: Fase 2). Marcar las casillas solo tras 8.1–8.2. Verificar: el próximo sync muestra agent-project con su objetivo y su %.
+- [x] 8.3 Actualizar `docs/ROADMAP.md` (nueva etapa "Control Center v2 — Fase 0–1", con su propio `## Objetivo actual` para que agent-project use el estándar desde el primer día) y `docs/PROGRESS.md` (estado y siguiente paso: Fase 2). Marcar las casillas solo tras 8.1–8.2. Verificar: el próximo sync muestra agent-project con su objetivo y su %.

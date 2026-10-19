@@ -79,3 +79,13 @@ Checkboxes `[x]` solo se marcan cuando la tarea fue **verificada en el código**
 - [x] Daemon local Node.js con reconexión automática y API `setAgentStatus`/`logEvent`.
 - [x] Indicador global, estado actual y consola de logs limitada a 200 eventos en Angular.
 - [ ] Aplicar la configuración nginx/token en producción y validar el primer evento real desde OpenClaw.
+
+## Etapa 8 — Control Center v2 (Fase 0–1) 🟢
+
+**Criterio de cierre**: Mi trabajo, el portafolio y el detalle de cambio cargan con datos reales en agent.srdejo.com.co. Detalle y verificación de cada punto en `openspec/changes/control-center-fase-1/tasks.md`.
+
+- [x] Estándar de objetivo (`## Objetivo actual`) en `README.md`, y objetivos aprobados y escritos en los 11 repos (2026-10-19).
+- [x] Backend rehecho sobre el arquetipo `powerup-arquetipo-rx` (Java 26, WebFlux, R2DBC) con sync v2 y avance contra el objetivo: 77 tests en verde.
+- [x] Generador v2 (`infra/portfolio/portfolio.py`): 22 tests en verde y 11 proyectos sincronizados.
+- [x] Frontend nuevo (Mi trabajo, portafolio, proyecto y cambio), verificado en Chrome headless a 375 px y 1280 px.
+- [x] Desplegado en `nolost-vps` con el JDK 26 estándar (`~/opt/jdk-26`): respaldo previo, V7 aplicada y sync verificado en `/api/health/sync`. Daniel lo confirmó en el navegador el 2026-10-19.
