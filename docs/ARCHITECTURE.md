@@ -27,7 +27,7 @@ infra/portfolio/portfolio.py --scp--> data/inbox/snapshot.json --WatchService-->
                                                                        ▼
                                                          Postgres (project, task, openspec_change, …)
                                                                        │
-                                     GET /api/portfolio · /api/projects/** · /api/work · /api/health/sync
+                                     GET /api/portfolio · /api/projects/** · /api/work · /api/daily · /api/health/sync
                                                                        ▼
                                                                Frontend (dashboard)
 ```
@@ -107,6 +107,7 @@ Aplicar un proyecto cambiado reemplaza sus filas en una transacción (`Transacti
 | `/api/projects/{id}/changes/{name}` | Artefactos (Markdown crudo) y tareas. |
 | `/api/projects/{id}/changes/{name}/continuation` | Instrucción determinista para retomar el cambio, más el comando `opsx` sugerido si está instalado. |
 | `/api/work` | Mi trabajo: `continue`, `actionable`, `decisions`, `review`, `activity`. |
+| `/api/daily` | El daily (`DailyUseCase`, una vista sobre Mi trabajo): `focus`, hasta 2 `alternatives` de otros proyectos, `needs` (bloqueos de esos proyectos, o las decisiones del portafolio si no hay), `commands` para la consola, `continuation`, `stale` y `text` (todo en texto plano). Determinista para los mismos datos y el mismo día (America/Bogota). |
 | `/api/health/sync` | `lastAttemptedSync`, `lastSuccessfulSync`, antigüedad, `stale` (umbral `agent-project.sync.stale-after`, por defecto `PT26H`) y `agentConnectivity`. |
 
 Un id inexistente responde 404 con `{"message": …}`.

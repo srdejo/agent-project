@@ -17,6 +17,8 @@ export class AgentMonitorService {
   readonly activity = signal('PC local desconectada');
   readonly logs = signal<AgentLog[]>([]);
   readonly connected = signal(false);
+  /** Last heartbeat the backend received from the agent; `null` if it never connected since the backend started. */
+  readonly lastSeen = signal<string | null>(null);
   private socket?: WebSocket;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
 
@@ -45,6 +47,7 @@ export class AgentMonitorService {
       if (message['type'] === 'agent_snapshot') {
         this.status.set(message['status'] as AgentStatus);
         this.activity.set(message['activity'] ?? '');
+        this.lastSeen.set(message['lastSeen'] || null);
       }
       if (message['type'] === 'log_event') {
         const parsed = this.parseLog(message['message'] ?? '');
@@ -67,7 +70,7 @@ export class AgentMonitorService {
     const text = match?.[2] ?? message;
     const event = {
       INBOUND: { type: 'INBOUND' as const, badge: '📥 Mensaje' },
-      TOOL: { type: 'TOOL' as const, badge: '🛠️ Tool' },
+      TOOL: { type: 'TOOL' as const, badge: '🛠️ Herramienta' },
       AI: { type: 'AI' as const, badge: '🧠 Pensando' },
       ERROR: { type: 'ERROR' as const, badge: '❌ Error' },
     }[type ?? ''];

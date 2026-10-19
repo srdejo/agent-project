@@ -1,0 +1,95 @@
+<section aria-labelledby="h-daily" class="mt-8 border border-surface-border bg-surface-card">
+  @switch (load().state) {
+    @case ('loading') {
+      <p class="font-mono text-[12px] text-ink-muted px-4 py-6">Armando el daily…</p>
+    }
+    @case ('error') {
+      <p class="font-mono text-[12px] text-status-warn px-4 py-6">No se pudo cargar /api/daily.</p>
+    }
+  }
+
+  @if (load(); as l) {
+    @if (l.state === 'ready') {
+      @let d = l.daily;
+      <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2 px-4 pt-4 pb-3 border-b border-surface-border">
+        <h2 id="h-daily" class="text-[15px] font-semibold tracking-tight">
+          Hoy <span class="font-mono text-[11px] font-normal text-ink-muted">· {{ d.date }}</span>
+        </h2>
+        <div class="flex items-center gap-3">
+          <span class="font-mono text-[11px]" aria-live="polite">
+            @if (copied() === 'ok') { <span class="text-status-ok">Copiado</span> }
+            @if (copied() === 'error') { <span class="text-status-warn">No se pudo copiar</span> }
+          </span>
+          <button type="button" (click)="copy(d.text)"
+                  class="font-mono text-[11px] uppercase tracking-wide px-3 py-1.5 bg-ink text-surface-bg hover:bg-ink/85">Copiar daily</button>
+        </div>
+      </div>
+
+      @if (d.stale) {
+        <p class="font-mono text-[11px] text-status-warn px-4 pt-3">Datos obsoletos: el último sync correcto supera el umbral. Confirma en los repos antes de seguir.</p>
+      }
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6 px-4 py-4">
+        <div class="min-w-0">
+          <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-2">Para hoy trabajaré en</h3>
+          @if (d.focus; as f) {
+            <a [routerLink]="link(f)" class="block border-l-2 border-accent pl-3 py-1 hover:bg-surface-divider/40 transition-colors">
+              <span class="text-[14px] font-semibold tracking-tight break-words">
+                {{ f.projectName }}
+                <span class="font-mono text-[12px] font-normal text-ink-muted">· {{ f.kind === 'CHANGE' ? f.changeName : 'ROADMAP' }}</span>
+                @if (f.done !== null) {
+                  <span class="font-mono text-[11px] font-normal tabular-nums text-ink-muted"> ({{ f.done }}/{{ f.total }})</span>
+                }
+              </span>
+              <p class="text-[12px] text-ink mt-1 break-words">
+                <span class="font-mono text-[10px] uppercase tracking-wide text-ink-muted mr-1">Siguiente</span>
+                @if (f.nextNumber) { <span class="font-mono">{{ f.nextNumber }}</span> } {{ f.nextText }}
+              </p>
+              @if (f.inObjective) {
+                <span class="inline-block font-mono text-[10px] uppercase tracking-wide px-1.5 py-0.5 mt-1.5 bg-accent/10 text-accent">En el objetivo</span>
+              }
+            </a>
+            @if (d.alternatives.length) {
+              <p class="font-mono text-[10px] uppercase tracking-wide text-ink-muted mt-4 mb-1.5">Alternativas, si el foco está bloqueado</p>
+              @for (a of d.alternatives; track a.projectId) {
+                <a [routerLink]="link(a)" class="block text-[12px] py-1 hover:text-accent transition-colors break-words line-clamp-2">
+                  <span class="font-semibold">{{ a.projectName }}</span>
+                  <span class="font-mono text-ink-muted"> · {{ a.kind === 'CHANGE' ? a.changeName : 'ROADMAP' }}:</span>
+                  @if (a.nextNumber) { <span class="font-mono"> {{ a.nextNumber }}</span> } {{ a.nextText }}
+                </a>
+              }
+            }
+          } @else {
+            <p class="text-[13px] text-ink-muted">Nada accionable: todo está hecho, bloqueado o en proyectos pausados.</p>
+          }
+
+          <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mt-6 mb-2">Para trabajar necesito</h3>
+          @for (n of d.needs; track n.projectId + n.description) {
+            <a [routerLink]="['/projects', n.projectId]" [queryParams]="{ tab: 'blockers' }"
+               class="block border-l-2 border-status-warn pl-3 py-1 mb-1.5 hover:bg-surface-divider/40 transition-colors">
+              <span class="font-mono text-[11px] text-ink-muted">{{ n.projectName }} · {{ blockerLabel[n.type] ?? n.type }}</span>
+              <p class="text-[12px] text-ink break-words">{{ n.description }}</p>
+              @if (n.owner) {
+                <p class="font-mono text-[10px] text-ink-muted">Responsable: {{ n.owner }}</p>
+              }
+            </a>
+          } @empty {
+            <p class="text-[13px] text-ink-muted">Nada pendiente de terceros.</p>
+          }
+        </div>
+
+        <div class="min-w-0">
+          @if (d.commands.length) {
+            <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-1">Ejecuta en consola</h3>
+            <p class="text-[11px] text-ink-muted mb-1.5">Desde la raíz del workspace.</p>
+            <pre class="font-mono text-[11px] leading-relaxed bg-surface-bg border border-surface-border p-3 overflow-x-auto">{{ d.commands.join('\n') }}</pre>
+          }
+          @if (d.continuation) {
+            <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mt-6 mb-2">Para continuar</h3>
+            <pre class="font-mono text-[11px] leading-relaxed bg-surface-bg border border-surface-border p-3 whitespace-pre-wrap break-words max-h-72 overflow-y-auto">{{ d.continuation }}</pre>
+          }
+        </div>
+      </div>
+    }
+  }
+</section>

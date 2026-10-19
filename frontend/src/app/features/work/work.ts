@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { catchError, map, of, startWith } from 'rxjs';
 import { Work } from '../../core/models/work';
 import { PortfolioApiService } from '../../core/services/portfolio-api.service';
+import { DailyBlock } from './daily';
 
 type Load = { state: 'loading' } | { state: 'error' } | { state: 'ready'; work: Work };
 
@@ -19,7 +20,7 @@ const REVIEW_LABEL: Record<string, string> = {
 
 @Component({
   selector: 'app-work',
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, DailyBlock],
   templateUrl: './work.html',
 })
 export class WorkPage {

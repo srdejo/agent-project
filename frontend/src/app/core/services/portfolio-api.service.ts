@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ChangeDetail, ChangeList, Continuation } from '../models/change';
+import { Daily } from '../models/daily';
 import { ProjectCard, ProjectDetail } from '../models/project';
 import { Work } from '../models/work';
 
@@ -36,5 +37,9 @@ export class PortfolioApiService {
 
   work(): Observable<Work> {
     return this.http.get<Work>('/api/work');
+  }
+
+  daily(): Observable<Daily> {
+    return this.http.get<Daily>('/api/daily');
   }
 }
