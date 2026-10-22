@@ -35,9 +35,9 @@ final class AggregateAssembler {
 
         ProgressCalculator.Result result = ProgressCalculator.calculate(new ProgressCalculator.Input(
                 rawStages.stream().map(s -> new StageIn(s.key(), s.title(), s.marker(), s.hasCriteria(), s.backlog(),
-                        s.tasks().stream().map(t -> new TaskIn(t.checked(), t.cancelled())).toList())).toList(),
+                        s.tasks().stream().map(t -> new TaskIn(t.checked(), t.cancelled(), t.text())).toList())).toList(),
                 pending.stream().map(pc -> new ChangeIn(pc.change().name(), pc.change().archived(),
-                        pc.tasks().stream().map(t -> new TaskIn(t.checked(), t.cancelled())).toList())).toList(),
+                        pc.tasks().stream().map(t -> new TaskIn(t.checked(), t.cancelled(), t.text())).toList())).toList(),
                 objectiveScope(snapshot),
                 snapshot.blockers().stream().map(b -> new BlockerIn(b.id(), b.affects())).toList()));
 

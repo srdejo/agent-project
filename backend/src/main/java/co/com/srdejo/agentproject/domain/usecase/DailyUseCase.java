@@ -4,17 +4,22 @@ import co.com.srdejo.agentproject.domain.api.IContinuationServicePort;
 import co.com.srdejo.agentproject.domain.api.IDailyServicePort;
 import co.com.srdejo.agentproject.domain.api.ISyncHealthServicePort;
 import co.com.srdejo.agentproject.domain.api.IWorkServicePort;
+import co.com.srdejo.agentproject.domain.model.ClosedTask;
 import co.com.srdejo.agentproject.domain.model.Project;
+import co.com.srdejo.agentproject.domain.model.RepoCommit;
 import co.com.srdejo.agentproject.domain.model.Stage;
 import co.com.srdejo.agentproject.domain.model.Task;
+import co.com.srdejo.agentproject.domain.model.TaskStatus;
 import co.com.srdejo.agentproject.domain.model.view.Continuation;
 import co.com.srdejo.agentproject.domain.model.view.Daily;
 import co.com.srdejo.agentproject.domain.model.view.Work;
+import co.com.srdejo.agentproject.domain.spi.IActivityPersistencePort;
 import co.com.srdejo.agentproject.domain.spi.IProjectPersistencePort;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -24,16 +29,21 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
- * The daily (spec {@code daily-plan}): a view over "Mi trabajo", so its priorities are exactly the ones Mi trabajo
- * uses. Deterministic: only stored data and today's date go in.
+ * The daily (spec {@code daily-plan}): what was done, a view over "Mi trabajo" for what to do (so its priorities are
+ * exactly the ones Mi trabajo uses) and what is blocked. Deterministic: only stored data and today's date go in.
  */
 public class DailyUseCase implements IDailyServicePort {
 
     private static final ZoneId BOGOTA = ZoneId.of("America/Bogota");
     private static final int ALTERNATIVES = 2;
-    private static final int PORTFOLIO_DECISIONS = 2;
+    private static final int ACTIVITY_DAYS = 7;
+    private static final int COMMITS_PER_PROJECT = 8;
+    private static final int TASK_TEXT = 100;
+    private static final Set<String> BLOCKER_STATES = Set.of("ACTIVE", "NEXT", "BLOCKED");
     private static final Map<String, String> BLOCKER_LABEL = Map.of(
             "PRODUCT_DECISION", "Decisión de producto",
             "EXTERNAL_DEPENDENCY", "Dependencia externa",
@@ -46,43 +56,133 @@ public class DailyUseCase implements IDailyServicePort {
     private final IContinuationServicePort continuations;
     private final ISyncHealthServicePort health;
     private final IProjectPersistencePort projects;
+    private final IActivityPersistencePort activity;
     private final Clock clock;
 
     public DailyUseCase(IWorkServicePort work, IContinuationServicePort continuations, ISyncHealthServicePort health,
-                        IProjectPersistencePort projects, Clock clock) {
+                        IProjectPersistencePort projects, IActivityPersistencePort activity, Clock clock) {
         this.work = work;
         this.continuations = continuations;
         this.health = health;
         this.projects = projects;
+        this.activity = activity;
         this.clock = clock;
     }
 
     @Override
     public Mono<Daily> getDaily() {
         LocalDate today = LocalDate.now(clock.withZone(BOGOTA));
-        return Mono.zip(work.getWork(), health.health()).flatMap(t -> {
-            Work w = t.getT1();
-            boolean stale = t.getT2().stale();
-            List<Candidate> chosen = choose(w);
-            if (chosen.isEmpty()) {
-                List<Daily.Need> needs = portfolioDecisions(w);
-                return Mono.just(new Daily(today, null, List.of(), needs, List.of(), null, stale,
-                        text(today, null, List.of(), needs, List.of(), null, stale)));
+        Instant weekStart = today.minusDays(ACTIVITY_DAYS).atStartOfDay(BOGOTA).toInstant();
+        Mono<List<Project>> all = projects.findAllProjects().sort(WorkRules.BY_RANK).collectList();
+        return Mono.zip(work.getWork(), health.health(), all,
+                        activity.findCommitsSince(weekStart).collectList(),
+                        activity.findClosedSince(weekStart).collectList(),
+                        blockedTasks())
+                .flatMap(t -> {
+                    Work w = t.getT1();
+                    boolean stale = t.getT2().stale();
+                    List<Project> ranked = t.getT3();
+                    Instant since = doneSince(today, t.getT4(), t.getT5());
+                    List<Daily.DoneGroup> done = done(ranked, since, t.getT4(), t.getT5());
+                    List<Daily.Blocker> blockers = blockers(ranked, t.getT6());
+                    List<Candidate> chosen = choose(w);
+                    if (chosen.isEmpty()) {
+                        return Mono.just(new Daily(today, since, done, null, List.of(), blockers, List.of(), null,
+                                stale, text(today, since, done, null, List.of(), blockers, List.of(), null, stale)));
+                    }
+                    Map<String, Project> byId = ranked.stream().collect(Collectors.toMap(Project::id, Function.identity()));
+                    List<Daily.Item> items = chosen.stream().map(c -> c.toItem(byId.get(c.projectId()))).toList();
+                    Daily.Item focus = items.get(0);
+                    List<Daily.Item> alternatives = items.subList(1, items.size());
+                    Project focusProject = byId.get(focus.projectId());
+                    List<String> commands = commands(focus, focusProject);
+                    return continuation(focus, chosen.get(0).taskId(), focusProject).map(cont -> new Daily(today,
+                            since, done, focus, alternatives, blockers, commands, cont, stale,
+                            text(today, since, done, focus, alternatives, blockers, commands, cont, stale)));
+                });
+    }
+
+    /** 00:00 of the last day before today with activity in the last week; today's 00:00 if there was none. */
+    static Instant doneSince(LocalDate today, List<RepoCommit> commits, List<ClosedTask> closed) {
+        LocalDate day = Stream.concat(commits.stream().map(RepoCommit::committedAt),
+                        closed.stream().map(ClosedTask::closedAt))
+                .map(i -> LocalDate.ofInstant(i, BOGOTA))
+                .filter(d -> d.isBefore(today))
+                .max(LocalDate::compareTo)
+                .orElse(today);
+        return day.atStartOfDay(BOGOTA).toInstant();
+    }
+
+    private static List<Daily.DoneGroup> done(List<Project> ranked, Instant since, List<RepoCommit> commits,
+                                              List<ClosedTask> closed) {
+        List<Daily.DoneGroup> groups = new ArrayList<>();
+        for (Project p : ranked) {
+            List<Daily.DoneTask> tasks = closed.stream()
+                    .filter(c -> c.projectId().equals(p.id()) && !c.closedAt().isBefore(since))
+                    .map(c -> new Daily.DoneTask(c.scope(), c.number(), c.text()))
+                    .toList();
+            List<RepoCommit> own = commits.stream()
+                    .filter(c -> c.projectId().equals(p.id()) && !c.committedAt().isBefore(since))
+                    .toList();
+            if (tasks.isEmpty() && own.isEmpty()) {
+                continue;
             }
-            return Flux.fromIterable(chosen)
-                    .concatMap(c -> projects.findProject(c.projectId()))
-                    .collectMap(Project::id, Function.identity())
-                    .flatMap(byId -> {
-                        List<Daily.Item> items = chosen.stream().map(c -> c.toItem(byId.get(c.projectId()))).toList();
-                        Daily.Item focus = items.get(0);
-                        List<Daily.Need> needs = needs(items, byId, w);
-                        Project focusProject = byId.get(focus.projectId());
-                        List<String> commands = commands(focus, focusProject);
-                        return continuation(focus, chosen.get(0).taskId(), focusProject).map(cont -> new Daily(today, focus,
-                                items.subList(1, items.size()), needs, commands, cont, stale,
-                                text(today, focus, items.subList(1, items.size()), needs, commands, cont, stale)));
-                    });
+            List<Daily.DoneCommit> shown = own.stream().limit(COMMITS_PER_PROJECT)
+                    .map(c -> new Daily.DoneCommit(c.sha(), c.subject())).toList();
+            groups.add(new Daily.DoneGroup(p.id(), p.name(), tasks, shown, own.size() - shown.size()));
+        }
+        return groups;
+    }
+
+    /** Tasks the repo declares blocked, outside archived changes, paired with their scope label. */
+    private Mono<List<ScopedTask>> blockedTasks() {
+        Mono<Set<String>> archived = projects.findAllChanges().collectList().map(PortfolioUseCase::archivedKeys);
+        Mono<List<Task>> declared = projects.findAllTasks()
+                .filter(t -> t.status() == TaskStatus.BLOCKED && t.blockedReason() != null
+                        && !ProgressCalculator.UNDEFINED_REASON.equals(t.blockedReason()))
+                .collectList();
+        return Mono.zip(archived, declared).flatMap(t -> {
+            List<Task> tasks = t.getT2().stream()
+                    .filter(task -> task.changeName() == null
+                            || !t.getT1().contains(WorkRules.key(task.projectId(), task.changeName())))
+                    .toList();
+            Set<String> withRoadmap = tasks.stream().filter(task -> task.changeName() == null).map(Task::projectId)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            return Flux.fromIterable(withRoadmap)
+                    .concatMap(id -> projects.findStages(id).collectList().map(s -> Map.entry(id, s)))
+                    .collectMap(Map.Entry::getKey, Map.Entry::getValue)
+                    .map(stages -> tasks.stream().map(task -> new ScopedTask(task, scope(task, stages))).toList());
         });
+    }
+
+    private static String scope(Task task, Map<String, List<Stage>> stages) {
+        if (task.changeName() != null) {
+            return task.changeName();
+        }
+        return stages.getOrDefault(task.projectId(), List.of()).stream()
+                .filter(s -> Objects.equals(s.ordinal(), task.stageOrdinal()))
+                .findFirst()
+                .map(s -> s.key() != null ? s.key() : s.title())
+                .orElse("ROADMAP");
+    }
+
+    private static List<Daily.Blocker> blockers(List<Project> ranked, List<ScopedTask> blocked) {
+        List<Project> relevant = ranked.stream().filter(p -> BLOCKER_STATES.contains(p.state())).toList();
+        List<Daily.Blocker> result = new ArrayList<>();
+        for (Project p : relevant) {
+            p.blockers().forEach(b -> result.add(new Daily.Blocker(p.id(), p.name(), "EDITORIAL", b.type(),
+                    b.description(), b.owner(), null, null, null)));
+        }
+        for (Project p : relevant) {
+            blocked.stream().filter(s -> s.task().projectId().equals(p.id())).forEach(s -> result.add(
+                    new Daily.Blocker(p.id(), p.name(), "TASK", null, s.task().blockedReason(), null, s.scope(),
+                            s.task().number(), shorten(s.task().text()))));
+        }
+        return result;
+    }
+
+    private static String shorten(String text) {
+        return text.length() <= TASK_TEXT ? text : text.substring(0, TASK_TEXT - 1).stripTrailing() + "…";
     }
 
     /** Continue items first, then the first actionable task of each project not yet chosen; one item per project. */
@@ -104,24 +204,6 @@ public class DailyUseCase implements IDailyServicePort {
             }
         }
         return chosen;
-    }
-
-    private static List<Daily.Need> needs(List<Daily.Item> items, Map<String, Project> byId, Work w) {
-        List<Daily.Need> needs = new ArrayList<>();
-        for (Daily.Item item : items) {
-            Project p = byId.get(item.projectId());
-            if (p == null) {
-                continue;
-            }
-            p.blockers().forEach(b -> needs.add(new Daily.Need(p.id(), p.name(), b.type(), b.description(), b.owner())));
-        }
-        return needs.isEmpty() ? portfolioDecisions(w) : needs;
-    }
-
-    private static List<Daily.Need> portfolioDecisions(Work w) {
-        return w.decisions().stream().limit(PORTFOLIO_DECISIONS)
-                .map(d -> new Daily.Need(d.projectId(), d.projectName(), "PRODUCT_DECISION", d.description(), d.owner()))
-                .toList();
     }
 
     private static List<String> commands(Daily.Item focus, Project project) {
@@ -169,15 +251,29 @@ public class DailyUseCase implements IDailyServicePort {
         return text.toString();
     }
 
-    static String text(LocalDate today, Daily.Item focus, List<Daily.Item> alternatives, List<Daily.Need> needs,
-                       List<String> commands, String continuation, boolean stale) {
+    static String text(LocalDate today, Instant since, List<Daily.DoneGroup> done, Daily.Item focus,
+                       List<Daily.Item> alternatives, List<Daily.Blocker> blockers, List<String> commands,
+                       String continuation, boolean stale) {
         StringBuilder t = new StringBuilder();
         t.append("Daily — ").append(today).append("\n\n");
         if (stale) {
             t.append("⚠ Datos obsoletos: el último sync correcto supera el umbral. Confirma en los repos antes de ")
                     .append("seguir.\n\n");
         }
-        t.append("Para hoy trabajaré en:\n");
+        t.append("Hecho (desde el ").append(LocalDate.ofInstant(since, BOGOTA)).append("):\n");
+        if (done.isEmpty()) {
+            t.append("- Sin actividad registrada.\n");
+        }
+        done.forEach(g -> {
+            t.append("- ").append(g.projectName()).append(":\n");
+            g.tasks().forEach(task -> t.append("  [x] ").append(task.scope()).append(' ')
+                    .append(task.number() == null ? "" : task.number() + " ").append(task.text()).append('\n'));
+            g.commits().forEach(c -> t.append("  ").append(c.sha()).append(' ').append(c.subject()).append('\n'));
+            if (g.moreCommits() > 0) {
+                t.append("  … y ").append(g.moreCommits()).append(" commits más\n");
+            }
+        });
+        t.append("\nPara hoy trabajaré en:\n");
         if (focus == null) {
             t.append("- Nada accionable: todo está hecho, bloqueado o en proyectos pausados.\n");
         } else {
@@ -188,15 +284,21 @@ public class DailyUseCase implements IDailyServicePort {
                 alternatives.forEach(a -> t.append("- ").append(label(a)).append(": ").append(next(a)).append('\n'));
             }
         }
-        t.append("\nPara trabajar necesito:\n");
-        if (needs.isEmpty()) {
-            t.append("- Nada pendiente de terceros.\n");
+        t.append("\nBloqueos:\n");
+        if (blockers.isEmpty()) {
+            t.append("- Nada bloqueado.\n");
         }
-        needs.forEach(n -> {
-            t.append("- ").append(n.projectName()).append(" (").append(BLOCKER_LABEL.getOrDefault(n.type(), n.type()))
-                    .append("): ").append(n.description());
-            if (n.owner() != null) {
-                t.append(" · responsable: ").append(n.owner());
+        blockers.forEach(b -> {
+            if ("TASK".equals(b.kind())) {
+                t.append("- ").append(b.projectName()).append(" · ").append(b.scope())
+                        .append(b.number() == null ? "" : " " + b.number()).append(" (tarea bloqueada): ")
+                        .append(b.description()).append('\n');
+                return;
+            }
+            t.append("- ").append(b.projectName()).append(" (").append(BLOCKER_LABEL.getOrDefault(b.type(), b.type()))
+                    .append("): ").append(b.description());
+            if (b.owner() != null) {
+                t.append(" · responsable: ").append(b.owner());
             }
             t.append('\n');
         });
@@ -220,6 +322,9 @@ public class DailyUseCase implements IDailyServicePort {
 
     private static String next(Daily.Item i) {
         return i.nextNumber() == null || i.nextNumber().isBlank() ? i.nextText() : i.nextNumber() + " " + i.nextText();
+    }
+
+    private record ScopedTask(Task task, String scope) {
     }
 
     private record Candidate(String projectId, String projectName, String kind, Long taskId, String changeName,

@@ -1,11 +1,14 @@
 package co.com.srdejo.agentproject.domain.usecase;
 
 import co.com.srdejo.agentproject.domain.model.Change;
+import co.com.srdejo.agentproject.domain.model.ClosedTask;
 import co.com.srdejo.agentproject.domain.model.Project;
 import co.com.srdejo.agentproject.domain.model.ProjectAggregate;
 import co.com.srdejo.agentproject.domain.model.ProjectSnapshot;
+import co.com.srdejo.agentproject.domain.model.RepoCommit;
 import co.com.srdejo.agentproject.domain.model.SnapshotBatch;
 import co.com.srdejo.agentproject.domain.model.SyncOutcome;
+import co.com.srdejo.agentproject.domain.model.Task;
 import org.junit.jupiter.api.Test;
 import reactor.test.StepVerifier;
 
@@ -23,6 +26,7 @@ import static co.com.srdejo.agentproject.domain.usecase.Fixtures.project;
 import static co.com.srdejo.agentproject.domain.usecase.Fixtures.rt;
 import static co.com.srdejo.agentproject.domain.usecase.Fixtures.stage;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 class SyncSnapshotUseCaseTest {
 
@@ -31,8 +35,9 @@ class SyncSnapshotUseCaseTest {
 
     private final InMemoryPorts.Projects projects = new InMemoryPorts.Projects();
     private final InMemoryPorts.Runs runs = new InMemoryPorts.Runs();
+    private final InMemoryPorts.Activity activity = new InMemoryPorts.Activity();
     private final SyncSnapshotUseCase useCase =
-            new SyncSnapshotUseCase(projects, runs, Clock.fixed(T2.plusMillis(250), ZoneOffset.UTC));
+            new SyncSnapshotUseCase(projects, runs, activity, Clock.fixed(T2.plusMillis(250), ZoneOffset.UTC));
 
     private static ProjectSnapshot nolost(String hash, boolean secondDone, ProjectSnapshot.Change kids) {
         return project("nolost").hash(hash).objective("Kids", "Etapa 1", "openspec:kids")
@@ -53,7 +58,7 @@ class SyncSnapshotUseCaseTest {
 
     @Test
     void createsAProjectWithDerivedCountersAndAHistoryPoint() {
-        StepVerifier.create(useCase.apply(nolost("h1", false, kids()), T1)).expectNext(SyncOutcome.CREATED).verifyComplete();
+        StepVerifier.create(useCase.apply(nolost("h1", false, kids()), T1, T1)).expectNext(SyncOutcome.CREATED).verifyComplete();
 
         Project p = stored().project();
         assertThat(p.objective().done()).isEqualTo(2);
@@ -68,9 +73,9 @@ class SyncSnapshotUseCaseTest {
 
     @Test
     void sameContentAndRuleVersionIsANoOp() {
-        useCase.apply(nolost("h1", false, kids()), T1).block();
+        useCase.apply(nolost("h1", false, kids()), T1, T1).block();
 
-        StepVerifier.create(useCase.apply(nolost("h1", false, kids()), T2)).expectNext(SyncOutcome.UNCHANGED).verifyComplete();
+        StepVerifier.create(useCase.apply(nolost("h1", false, kids()), T2, T2)).expectNext(SyncOutcome.UNCHANGED).verifyComplete();
 
         assertThat(projects.replaceCalls).isEqualTo(1);
         assertThat(projects.points).hasSize(1);
@@ -78,9 +83,9 @@ class SyncSnapshotUseCaseTest {
 
     @Test
     void differentContentReplacesTheProject() {
-        useCase.apply(nolost("h1", false, kids()), T1).block();
+        useCase.apply(nolost("h1", false, kids()), T1, T1).block();
 
-        StepVerifier.create(useCase.apply(nolost("h2", true, kids()), T2)).expectNext(SyncOutcome.UPDATED).verifyComplete();
+        StepVerifier.create(useCase.apply(nolost("h2", true, kids()), T2, T2)).expectNext(SyncOutcome.UPDATED).verifyComplete();
 
         assertThat(stored().project().objective().done()).isEqualTo(3);
         assertThat(stored().tasks()).hasSize(5);
@@ -88,19 +93,76 @@ class SyncSnapshotUseCaseTest {
     }
 
     @Test
-    void ruleVersionChangeForcesReapplication() {
-        useCase.apply(nolost("h1", false, kids()), T1).block();
+    void taskClosedBetweenSyncsIsRecordedWithTheSnapshotDate() {
+        Instant generated = T2.minusSeconds(30);
+        useCase.apply(nolost("h1", false, kids()), T1, T1).block();
+
+        useCase.apply(nolost("h2", true, change("kids", ct("1.1", "Uno", true), ct("1.2", "Dos", true))), T2, generated)
+                .block();
+
+        assertThat(activity.closed).extracting(ClosedTask::source, ClosedTask::scope, ClosedTask::number,
+                        ClosedTask::text, ClosedTask::closedAt)
+                .containsExactlyInAnyOrder(
+                        tuple(Task.TaskSource.ROADMAP, "Etapa 1", null, "B", generated),
+                        tuple(Task.TaskSource.OPENSPEC, "kids", "1.2", "Dos", generated));
+    }
+
+    @Test
+    void newChangeAlreadyCheckedAndCreatedProjectRecordNothing() {
+        useCase.apply(nolost("h1", false, kids()), T1, T1).block();
+        assertThat(activity.closed).isEmpty();
+
+        useCase.apply(project("nolost").hash("h2").objective("Kids", "Etapa 1", "openspec:kids")
+                .stage(stage("Etapa 1", "in_progress", rt("A", true), rt("B", false)))
+                .stage(stage("Etapa 2", "none", rt("C", false)))
+                .change(kids()).change(change("nuevo", ct("1.1", "Ya hecha", true)))
+                .decision("umbral", "Etapa 2").build(), T2, T2).block();
+
+        assertThat(activity.closed).isEmpty();
+    }
+
+    @Test
+    void ruleVersionReapplicationRecordsNoClosedTasks() {
+        useCase.apply(nolost("h1", false, kids()), T1, T1).block();
         projects.aggregates.put("nolost", new ProjectAggregate(stored().project().withRuleVersion(0), stored().stages(),
                 stored().changes(), stored().tasks()));
 
-        StepVerifier.create(useCase.apply(nolost("h1", false, kids()), T2)).expectNext(SyncOutcome.UPDATED).verifyComplete();
+        useCase.apply(nolost("h1", false, kids()), T2, T2).block();
+
+        assertThat(activity.closed).isEmpty();
+    }
+
+    @Test
+    void activityReplacesCommitsWithoutTouchingTheProjectOutcome() {
+        useCase.apply(nolost("h1", false, kids()), T1, T1).block();
+        RepoCommit commit = new RepoCommit("nolost", "abc1234", T1, "feat: algo");
+        SnapshotBatch withActivity = new SnapshotBatch(2, "test", Fixtures.GENERATED_AT,
+                List.of(nolost("h1", false, kids())), Map.of(), Map.of(), Map.of(), Map.of("nolost", List.of(commit)));
+
+        StepVerifier.create(useCase.applySnapshot(withActivity, T2))
+                .assertNext(run -> assertThat(run.unchanged()).containsExactly("nolost"))
+                .verifyComplete();
+        assertThat(activity.commits).containsEntry("nolost", List.of(commit));
+
+        useCase.applySnapshot(batch(nolost("h1", false, kids())), T2).block();
+
+        assertThat(activity.commits).containsEntry("nolost", List.of(commit));
+    }
+
+    @Test
+    void ruleVersionChangeForcesReapplication() {
+        useCase.apply(nolost("h1", false, kids()), T1, T1).block();
+        projects.aggregates.put("nolost", new ProjectAggregate(stored().project().withRuleVersion(0), stored().stages(),
+                stored().changes(), stored().tasks()));
+
+        StepVerifier.create(useCase.apply(nolost("h1", false, kids()), T2, T2)).expectNext(SyncOutcome.UPDATED).verifyComplete();
     }
 
     @Test
     void unreadableChangeKeepsItsLastValidVersion() {
-        useCase.apply(nolost("h1", false, kids()), T1).block();
+        useCase.apply(nolost("h1", false, kids()), T1, T1).block();
 
-        useCase.apply(nolost("h2", true, brokenChange("kids")), T2).block();
+        useCase.apply(nolost("h2", true, brokenChange("kids")), T2, T2).block();
 
         Change kept = stored().changes().get(0);
         assertThat(kept.parseError()).isEqualTo("ilegible");
@@ -113,7 +175,7 @@ class SyncSnapshotUseCaseTest {
 
     @Test
     void unreadableChangeNeverSeenIsStoredEmpty() {
-        useCase.apply(nolost("h1", false, brokenChange("kids")), T1).block();
+        useCase.apply(nolost("h1", false, brokenChange("kids")), T1, T1).block();
 
         assertThat(stored().changes()).singleElement().satisfies(c -> {
             assertThat(c.parseError()).isEqualTo("ilegible");
@@ -127,7 +189,7 @@ class SyncSnapshotUseCaseTest {
         ProjectSnapshot hub = project("hub").objective("Pagos", "openspec:pagos")
                 .archived("2026-09-01-pagos", ct("1.1", "x", true)).build();
 
-        useCase.apply(hub, T1).block();
+        useCase.apply(hub, T1, T1).block();
 
         Project p = projects.aggregates.get("hub").project();
         assertThat(p.objective().done()).isEqualTo(1);
@@ -137,9 +199,9 @@ class SyncSnapshotUseCaseTest {
 
     @Test
     void batchRecordsOutcomesReadErrorsMissingAndDuration() {
-        useCase.apply(nolost("h1", false, kids()), T1).block();
-        useCase.apply(project("contact").build(), T1).block();
-        useCase.apply(project("hotel").build(), T1).block();
+        useCase.apply(nolost("h1", false, kids()), T1, T1).block();
+        useCase.apply(project("contact").build(), T1, T1).block();
+        useCase.apply(project("hotel").build(), T1, T1).block();
         SnapshotBatch batch = new SnapshotBatch(2, "test", Fixtures.GENERATED_AT,
                 List.of(nolost("h1", false, kids()), project("visionarios").build()),
                 Map.of("bad", "state inválido: NOW"), Map.of("hotel", "ROADMAP.md: permiso denegado"),
@@ -163,7 +225,7 @@ class SyncSnapshotUseCaseTest {
 
     @Test
     void missingProjectComesBackClean() {
-        useCase.apply(nolost("h1", false, kids()), T1).block();
+        useCase.apply(nolost("h1", false, kids()), T1, T1).block();
         useCase.applySnapshot(batch(project("otro").build()), T1).block();
         assertThat(stored().project().missingSince()).isEqualTo(T1);
 

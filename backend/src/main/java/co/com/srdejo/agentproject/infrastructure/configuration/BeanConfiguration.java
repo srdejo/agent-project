@@ -6,6 +6,7 @@ import co.com.srdejo.agentproject.domain.api.IPortfolioServicePort;
 import co.com.srdejo.agentproject.domain.api.ISyncHealthServicePort;
 import co.com.srdejo.agentproject.domain.api.ISyncServicePort;
 import co.com.srdejo.agentproject.domain.api.IWorkServicePort;
+import co.com.srdejo.agentproject.domain.spi.IActivityPersistencePort;
 import co.com.srdejo.agentproject.domain.spi.IAgentPresencePort;
 import co.com.srdejo.agentproject.domain.spi.IProjectPersistencePort;
 import co.com.srdejo.agentproject.domain.spi.ISyncRunPersistencePort;
@@ -18,6 +19,7 @@ import co.com.srdejo.agentproject.domain.usecase.WorkUseCase;
 import co.com.srdejo.agentproject.infrastructure.input.inbox.SnapshotParser;
 import co.com.srdejo.agentproject.infrastructure.input.websocket.AgentPresenceService;
 import co.com.srdejo.agentproject.infrastructure.out.agent.AgentPresenceAdapter;
+import co.com.srdejo.agentproject.infrastructure.out.r2dbc.adapter.ActivityR2dbcAdapter;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.adapter.ProjectR2dbcAdapter;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.adapter.SyncRunR2dbcAdapter;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.mapper.JsonbCodec;
@@ -25,8 +27,10 @@ import co.com.srdejo.agentproject.infrastructure.out.r2dbc.mapper.R2dbcEntityMap
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.repository.IObjectiveProgressPointRepository;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.repository.IOpenSpecChangeRepository;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.repository.IProjectRepository;
+import co.com.srdejo.agentproject.infrastructure.out.r2dbc.repository.IRepoCommitRepository;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.repository.IRoadmapStageRepository;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.repository.ISyncRunRepository;
+import co.com.srdejo.agentproject.infrastructure.out.r2dbc.repository.ITaskClosedRepository;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.repository.ITaskRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,6 +53,8 @@ public class BeanConfiguration {
     private final ITaskRepository taskRepository;
     private final IObjectiveProgressPointRepository pointRepository;
     private final ISyncRunRepository syncRunRepository;
+    private final IRepoCommitRepository commitRepository;
+    private final ITaskClosedRepository closedRepository;
     private final TransactionalOperator transactionalOperator;
     private final AgentPresenceService agentPresenceService;
     private final JsonMapper jsonMapper;
@@ -83,13 +89,19 @@ public class BeanConfiguration {
     }
 
     @Bean
+    public IActivityPersistencePort activityPersistencePort() {
+        return new ActivityR2dbcAdapter(commitRepository, closedRepository, r2dbcEntityMapper(), transactionalOperator);
+    }
+
+    @Bean
     public IAgentPresencePort agentPresencePort() {
         return new AgentPresenceAdapter(agentPresenceService);
     }
 
     @Bean
     public ISyncServicePort syncServicePort() {
-        return new SyncSnapshotUseCase(projectPersistencePort(), syncRunPersistencePort(), clock());
+        return new SyncSnapshotUseCase(projectPersistencePort(), syncRunPersistencePort(), activityPersistencePort(),
+                clock());
     }
 
     @Bean
@@ -115,6 +127,6 @@ public class BeanConfiguration {
     @Bean
     public IDailyServicePort dailyServicePort() {
         return new DailyUseCase(workServicePort(), continuationServicePort(), syncHealthServicePort(),
-                projectPersistencePort(), clock());
+                projectPersistencePort(), activityPersistencePort(), clock());
     }
 }

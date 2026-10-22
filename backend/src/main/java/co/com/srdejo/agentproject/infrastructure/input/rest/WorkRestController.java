@@ -30,7 +30,7 @@ public class WorkRestController {
         return workHandler.getSyncHealth();
     }
 
-    @Operation(summary = "Daily: focus, alternatives, needs, console commands and continuation, plus the plain text")
+    @Operation(summary = "Daily: done since the last active day, focus and alternatives, blockers, console commands and continuation, plus the plain text")
     @GetMapping("/daily")
     public Mono<DailyResponseDto> getDaily() {
         return workHandler.getDaily();

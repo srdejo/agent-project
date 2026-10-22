@@ -21,8 +21,8 @@ public abstract class IntegrationTestSupport {
 
     @BeforeEach
     void wipe() {
-        db.sql("TRUNCATE project, roadmap_stage, openspec_change, task, objective_progress_point, sync_run "
-                + "RESTART IDENTITY CASCADE").then().block();
+        db.sql("TRUNCATE project, roadmap_stage, openspec_change, task, objective_progress_point, sync_run, "
+                + "repo_commit, task_closed RESTART IDENTITY CASCADE").then().block();
     }
 
     protected static String snapshotJson(String projects) {

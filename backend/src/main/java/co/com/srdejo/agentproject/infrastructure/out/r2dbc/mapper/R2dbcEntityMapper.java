@@ -1,8 +1,10 @@
 package co.com.srdejo.agentproject.infrastructure.out.r2dbc.mapper;
 
 import co.com.srdejo.agentproject.domain.model.Change;
+import co.com.srdejo.agentproject.domain.model.ClosedTask;
 import co.com.srdejo.agentproject.domain.model.ProgressPoint;
 import co.com.srdejo.agentproject.domain.model.Project;
+import co.com.srdejo.agentproject.domain.model.RepoCommit;
 import co.com.srdejo.agentproject.domain.model.Stage;
 import co.com.srdejo.agentproject.domain.model.SyncRun;
 import co.com.srdejo.agentproject.domain.model.Task;
@@ -10,6 +12,8 @@ import co.com.srdejo.agentproject.domain.model.TaskStatus;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.entity.ObjectiveProgressPointEntity;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.entity.OpenSpecChangeEntity;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.entity.ProjectEntity;
+import co.com.srdejo.agentproject.infrastructure.out.r2dbc.entity.RepoCommitEntity;
+import co.com.srdejo.agentproject.infrastructure.out.r2dbc.entity.TaskClosedEntity;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.entity.RoadmapStageEntity;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.entity.SyncRunEntity;
 import co.com.srdejo.agentproject.infrastructure.out.r2dbc.entity.TaskEntity;
@@ -107,6 +111,20 @@ public class R2dbcEntityMapper {
                 e.getOrdinal(), e.getNumber(), e.getText(), e.getSection(), e.getLine(), e.isChecked(),
                 e.isCancelled(), TaskStatus.valueOf(e.getStatus()), e.getBlockedReason(), e.isInObjective(),
                 e.getHeldByBlocker());
+    }
+
+    public RepoCommit toCommit(RepoCommitEntity e) {
+        return new RepoCommit(e.getProjectId(), e.getSha(), e.getCommittedAt(), e.getSubject());
+    }
+
+    public TaskClosedEntity toEntity(ClosedTask c) {
+        return new TaskClosedEntity(c.id(), c.projectId(), c.source().name(), c.scope(), c.number(), c.text(),
+                c.closedAt());
+    }
+
+    public ClosedTask toClosed(TaskClosedEntity e) {
+        return new ClosedTask(e.getId(), e.getProjectId(), Task.TaskSource.valueOf(e.getSource()), e.getScope(),
+                e.getNumber(), e.getText(), e.getClosedAt());
     }
 
     public ObjectiveProgressPointEntity toEntity(ProgressPoint p) {

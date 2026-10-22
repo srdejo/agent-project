@@ -174,4 +174,55 @@ class ProgressCalculatorTest {
                 .allMatch(t -> "pagos".equals(t.heldByBlocker()));
         assertThat(r.stageTasks().get(1).get(0).heldByBlocker()).isNull();
     }
+
+    @Test
+    void declaredBlockReasonAcceptsTheThreeForms() {
+        assertThat(ProgressCalculator.declaredBlockReason("Verificar en prod. Bloqueada (2026-10-22): en prod no hay "
+                + "asesores, y los usuarios salen del hub (ver DECISIONS.md). Además falta el CSV."))
+                .isEqualTo("en prod no hay asesores, y los usuarios salen del hub (ver DECISIONS.md)");
+        assertThat(ProgressCalculator.declaredBlockReason("Pagos. bloqueado: falta elegir proveedor."))
+                .isEqualTo("falta elegir proveedor");
+        assertThat(ProgressCalculator.declaredBlockReason("Importar el Excel (bloqueada: la sede no lo envió) y revisar"))
+                .isEqualTo("la sede no lo envió");
+    }
+
+    @Test
+    void mentionWithoutColonIsNotAMarker() {
+        assertThat(ProgressCalculator.declaredBlockReason("Probar qué pasa si el hub queda bloqueado")).isNull();
+        assertThat(ProgressCalculator.declaredBlockReason("Desbloqueada: ya no aplica")).isNull();
+    }
+
+    @Test
+    void longReasonIsCutTo200Characters() {
+        String reason = ProgressCalculator.declaredBlockReason("Bloqueada: " + "x".repeat(300));
+        assertThat(reason).hasSize(200).endsWith("…");
+    }
+
+    @Test
+    void declaredBlockAppliesToOpenTasksOfBothSources() {
+        TaskIn blocked = new TaskIn(false, false, "4.9 Verificar. Bloqueada: faltan asesores");
+        TaskIn doneWithMarker = new TaskIn(true, false, "Bloqueada: ya resuelto");
+        Result r = ProgressCalculator.calculate(input(
+                List.of(stage("Etapa 1", "in_progress", List.of(blocked, doneWithMarker))),
+                List.of(new ChangeIn("mvp", false, List.of(blocked, doneWithMarker, new TaskIn(false, false, "x")))),
+                null));
+
+        assertThat(r.stageTasks().get(0)).extracting(TaskOut::status)
+                .containsExactly(TaskStatus.BLOCKED, TaskStatus.DONE);
+        assertThat(r.stageTasks().get(0).get(0).blockedReason()).isEqualTo("faltan asesores");
+        assertThat(r.changeTasks().get(0)).extracting(TaskOut::status)
+                .containsExactly(TaskStatus.BLOCKED, TaskStatus.DONE, TaskStatus.OPEN);
+        assertThat(r.changeTasks().get(0).get(0).blockedReason()).isEqualTo("faltan asesores");
+        assertThat(r.roadmap()).isEqualTo(new Counts(1, 2));
+    }
+
+    @Test
+    void declaredBlockWinsOverUndefinedStage() {
+        StageIn undefined = new StageIn("Etapa 2", "Etapa 2 — sin criterio", "none", false, false,
+                List.of(new TaskIn(false, false, "Bloqueada: falta el dominio"), new TaskIn(false, false, "y")));
+        Result r = ProgressCalculator.calculate(input(List.of(undefined), List.of(), null));
+
+        assertThat(r.stageTasks().get(0)).extracting(TaskOut::blockedReason)
+                .containsExactly("falta el dominio", ProgressCalculator.UNDEFINED_REASON);
+    }
 }

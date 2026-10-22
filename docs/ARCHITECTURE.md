@@ -45,6 +45,9 @@ No existe ningún endpoint HTTP de escritura. Todo el vhost (`/`, `/api/`, `/ws/
 | Cambios OpenSpec, artefactos, tareas de `tasks.md`, comandos `opsx` | `openspec/` y `.claude/commands/opsx/` de cada repo. |
 | Estado de cada tarea, avance del objetivo y del roadmap, tareas afectadas por cada bloqueo | **Derivados en el backend** por `ProgressCalculator` al aplicar el snapshot (spec `progress-model`). |
 | `source_commit`, `source_modified_at` | Git del repo, o el `mtime` de los archivos sin commitear. |
+| Commits recientes | Bloque `activity` del snapshot (7 días, fuera de las entradas), guardado en `repo_commit`. |
+| Tareas cerradas | **Derivadas en el backend**: al aplicar un proyecto `UPDATED`, cada tarea que pasó de abierta a `[x]` se registra en `task_closed`. |
+| Tareas bloqueadas por texto | **Derivadas en el backend** por `ProgressCalculator`: `Bloqueada: <motivo>` en el texto de la tarea. |
 | Historial de avance | `objective_progress_point`, un punto por cada `CREATED`/`UPDATED` de un proyecto con objetivo. |
 | Salud del sync | `sync_run`, una fila por cada procesamiento del inbox. |
 | Conectividad del agente | Heartbeat del WebSocket `/ws/agent`, nunca "la API respondió". |
@@ -61,9 +64,10 @@ backend/src/main/java/co/com/srdejo/agentproject/
     model/view/                   modelos de lectura: ProjectCard, ProjectDetail, ChangeList, Work, SyncHealth, …
     api/                          puertos de entrada: ISyncServicePort, IPortfolioServicePort, IWorkServicePort,
                                   IContinuationServicePort, ISyncHealthServicePort
-    spi/                          puertos de salida: IProjectPersistencePort, ISyncRunPersistencePort, IAgentPresencePort
+    spi/                          puertos de salida: IProjectPersistencePort, ISyncRunPersistencePort,
+                                  IActivityPersistencePort, IAgentPresencePort
     usecase/                      ProgressCalculator (la regla), SyncSnapshotUseCase, PortfolioUseCase, WorkUseCase,
-                                  ContinuationUseCase, SyncHealthUseCase
+                                  ContinuationUseCase, SyncHealthUseCase, DailyUseCase
   application/
     dto/response/                 contratos JSON de la API
     mapper/                       MapStruct: modelo de lectura → DTO
@@ -82,7 +86,7 @@ backend/src/main/java/co/com/srdejo/agentproject/
 
 Reglas de dependencia: `infrastructure` → `application` → `domain`, nunca al revés. Los use cases no llevan anotaciones de Spring; los instancia `BeanConfiguration`. El mapeo entidad ⇄ dominio es manual (`R2dbcEntityMapper`), no MapStruct, porque casi todo es (de)serialización JSONB de tipos genéricos.
 
-### Esquema (Flyway V1–V7)
+### Esquema (Flyway V1–V8)
 
 V1–V6 son el modelo anterior. **V7** (`V7__control_center_v2.sql`) elimina `projects`, `project_snapshots` y `sync_runs` con su historial, y crea:
 
@@ -94,6 +98,13 @@ V1–V6 son el modelo anterior. **V7** (`V7__control_center_v2.sql`) elimina `pr
 | `task` | Una fila por checkbox, con su `stage_id` o `change_id`; `status`, `blocked_reason`, `in_objective` y `held_by_blocker` derivados. |
 | `objective_progress_point` | Historial del avance por objetivo. |
 | `sync_run` | Cada procesamiento del inbox: duración, versión del formato y del generador, `generated_at`, error de archivo e ids creados, actualizados, sin cambios, ausentes, rechazados, con error de lectura y avisos. |
+
+**V8** (`V8__repo_activity.sql`) agrega la actividad para la sección "Hecho" del daily:
+
+| Tabla | Contenido |
+|---|---|
+| `repo_commit` | Commits del bloque `activity`, PK `(project_id, sha)`, sin FK a `project`. Se reemplazan por proyecto en cada sync que los trae. |
+| `task_closed` | Historial de tareas cerradas entre dos syncs: origen, `scope` (cambio o etapa), número, texto y `closed_at` (el `generated_at` del snapshot). El sync solo inserta. |
 
 Aplicar un proyecto cambiado reemplaza sus filas en una transacción (`TransactionalOperator`). Un cambio OpenSpec ilegible conserva su versión anterior.
 
@@ -107,7 +118,7 @@ Aplicar un proyecto cambiado reemplaza sus filas en una transacción (`Transacti
 | `/api/projects/{id}/changes/{name}` | Artefactos (Markdown crudo) y tareas. |
 | `/api/projects/{id}/changes/{name}/continuation` | Instrucción determinista para retomar el cambio, más el comando `opsx` sugerido si está instalado. |
 | `/api/work` | Mi trabajo: `continue`, `actionable`, `decisions`, `review`, `activity`. |
-| `/api/daily` | El daily (`DailyUseCase`, una vista sobre Mi trabajo): `focus`, hasta 2 `alternatives` de otros proyectos, `needs` (bloqueos de esos proyectos, o las decisiones del portafolio si no hay), `commands` para la consola, `continuation`, `stale` y `text` (todo en texto plano). Determinista para los mismos datos y el mismo día (America/Bogota). |
+| `/api/daily` | El daily (`DailyUseCase`): `doneSince` y `done` (commits y tareas cerradas por proyecto desde las 00:00 del último día anterior con actividad, máximo 8 commits por proyecto); `focus` y hasta 2 `alternatives` de otros proyectos, sacados de Mi trabajo y sin tareas bloqueadas; `blockers` (los editoriales de todos los proyectos `ACTIVE`/`NEXT`/`BLOCKED` por prioridad, y después las tareas bloqueadas por texto); `commands`, `continuation`, `stale` y `text` (todo en texto plano). Determinista para los mismos datos y el mismo día (America/Bogota). |
 | `/api/health/sync` | `lastAttemptedSync`, `lastSuccessfulSync`, antigüedad, `stale` (umbral `agent-project.sync.stale-after`, por defecto `PT26H`) y `agentConnectivity`. |
 
 Un id inexistente responde 404 con `{"message": …}`.

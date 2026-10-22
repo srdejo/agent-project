@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -19,11 +20,15 @@ import java.util.regex.Pattern;
 public final class ProgressCalculator {
 
     /** Bump whenever a rule here changes: stored projects are re-derived on the next snapshot even if unchanged. */
-    public static final int RULE_VERSION = 1;
+    public static final int RULE_VERSION = 2;
 
     public static final String UNDEFINED_REASON = "falta de definición";
     private static final String OPENSPEC_PREFIX = "openspec:";
     private static final Pattern ARCHIVE_DATE_PREFIX = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}-");
+    private static final Pattern BLOCKED_MARKER = Pattern.compile(
+            "(\\()?\\bbloquead[ao]\\b(?:\\s*\\([^)]*\\))?\\s*:\\s*(.+)",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.DOTALL);
+    private static final int MAX_REASON = 200;
 
     private ProgressCalculator() {
     }
@@ -41,8 +46,10 @@ public final class ProgressCalculator {
         for (ChangeIn change : input.changes()) {
             List<TaskOut> out = new ArrayList<>();
             for (TaskIn task : change.tasks()) {
+                String declared = openDeclaredBlock(task);
                 out.add(new TaskOut(task.cancelled() ? TaskStatus.CANCELLED
-                        : task.checked() ? TaskStatus.DONE : TaskStatus.OPEN, null));
+                        : task.checked() ? TaskStatus.DONE
+                        : declared != null ? TaskStatus.BLOCKED : TaskStatus.OPEN, declared));
             }
             changeTasks.add(out);
         }
@@ -92,7 +99,7 @@ public final class ProgressCalculator {
         if (task.checked()) {
             return TaskStatus.DONE;
         }
-        if ("none".equals(stage.marker()) && !stage.hasCriteria()) {
+        if (openDeclaredBlock(task) != null || "none".equals(stage.marker()) && !stage.hasCriteria()) {
             return TaskStatus.BLOCKED;
         }
         if ("in_progress".equals(stage.marker())) {
@@ -102,7 +109,42 @@ public final class ProgressCalculator {
     }
 
     private static String reason(TaskIn task, StageIn stage) {
-        return roadmapStatus(task, stage) == TaskStatus.BLOCKED ? UNDEFINED_REASON : null;
+        if (roadmapStatus(task, stage) != TaskStatus.BLOCKED) {
+            return null;
+        }
+        String declared = openDeclaredBlock(task);
+        return declared != null ? declared : UNDEFINED_REASON;
+    }
+
+    private static String openDeclaredBlock(TaskIn task) {
+        return task.checked() || task.cancelled() ? null : declaredBlockReason(task.text());
+    }
+
+    /** The reason of a task the repo declares blocked ("Bloqueada: …", "Bloqueada (fecha): …", "(bloqueada: …)"), or {@code null}. */
+    static String declaredBlockReason(String text) {
+        if (text == null) {
+            return null;
+        }
+        Matcher m = BLOCKED_MARKER.matcher(text);
+        if (!m.find()) {
+            return null;
+        }
+        String reason = m.group(2);
+        if (m.group(1) != null && reason.indexOf(')') >= 0) {
+            reason = reason.substring(0, reason.indexOf(')'));
+        }
+        int sentence = reason.indexOf(". ");
+        if (sentence >= 0) {
+            reason = reason.substring(0, sentence);
+        }
+        reason = reason.strip();
+        if (reason.endsWith(".")) {
+            reason = reason.substring(0, reason.length() - 1);
+        }
+        if (reason.length() > MAX_REASON) {
+            reason = reason.substring(0, MAX_REASON - 1).stripTrailing() + "…";
+        }
+        return reason.isEmpty() ? null : reason;
     }
 
     private static Counts count(Iterable<TaskOut> tasks) {
@@ -181,7 +223,11 @@ public final class ProgressCalculator {
     public record ChangeIn(String name, boolean archived, List<TaskIn> tasks) {
     }
 
-    public record TaskIn(boolean checked, boolean cancelled) {
+    public record TaskIn(boolean checked, boolean cancelled, String text) {
+
+        public TaskIn(boolean checked, boolean cancelled) {
+            this(checked, cancelled, "");
+        }
     }
 
     public record BlockerIn(String id, List<String> affects) {

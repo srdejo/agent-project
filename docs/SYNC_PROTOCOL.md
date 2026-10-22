@@ -44,7 +44,7 @@ El generador **no calcula** porcentajes, estados de tarea ni estado del proyecto
 ```json
 {
   "format_version": 2,
-  "generator_version": "portfolio.py 2.0",
+  "generator_version": "portfolio.py 2.1",
   "generated_at": "2026-10-15T07:00:00-05:00",
   "projects": {
     "distriapp": {
@@ -127,6 +127,14 @@ El generador **no calcula** porcentajes, estados de tarea ni estado del proyecto
       }
     },
     "contact": { "error": "docs/ROADMAP.md: no se pudo leer (permiso denegado)" }
+  },
+  "activity": {
+    "since": "2026-10-08T07:00:00-05:00",
+    "projects": {
+      "distriapp": [
+        { "sha": "53e5562", "at": "2026-10-14T18:30:00-05:00", "subject": "docs(openspec): propuesta usuarios-desde-subscription-hub" }
+      ]
+    }
   }
 }
 ```
@@ -139,6 +147,7 @@ El generador **no calcula** porcentajes, estados de tarea ni estado del proyecto
 | `generator_version` | string | no | Se guarda en el sync run, para auditar. |
 | `generated_at` | datetime ISO-8601 con offset | sí | Momento de la lectura de los repos. De aquí sale la antigüedad de los datos (`/api/health/sync`). |
 | `projects` | objeto `id -> entrada` | sí | Id estable del proyecto (nombre de la carpeta del repo). |
+| `activity` | objeto | no | Ver [Actividad](#actividad). Ausente = el backend conserva los commits que tenía. |
 
 ### Entrada de proyecto
 
@@ -186,6 +195,14 @@ Cada artefacto lleva `content` y `truncated`. **Límite: 200 KB por artefacto.**
 - `affects` admite las mismas referencias que el alcance del objetivo (`Etapa 3`, `openspec:<cambio>`).
 - Una decisión que afecta a varias cosas es **un** bloqueo con varios `affects`, no varios bloqueos.
 
+### Tareas bloqueadas por texto
+
+Una tarea abierta (de ROADMAP o de `tasks.md`) cuyo texto contenga `Bloqueada: <motivo>`, `Bloqueada (<lo que sea>): <motivo>` o `(bloqueada: <motivo>)`, sin distinguir mayúsculas, queda `BLOCKED` con ese motivo. El motivo llega hasta el primer `. `, o hasta el `)` si el marcador abrió paréntesis, con un máximo de 200 caracteres. Sin los dos puntos no es marcador ("si queda bloqueado"). Una tarea `[x]` o tachada no cambia. El generador no hace nada especial: el backend lo lee del texto.
+
+### Actividad
+
+`activity`: `{since, projects: {id -> [{sha, at, subject}]}}`. Son los commits sin merges de todas las ramas desde `since` (7 días), sin duplicados, máximo 30 por repo, los más recientes primero. Va **fuera de las entradas** porque la ventana se mueve cada día: dentro de la entrada cambiaría su hash aunque el repo no cambiara.
+
 ## Cómo aplica el backend cada entrada
 
 1. **Detección de cambios por contenido.** El backend calcula el SHA-256 del JSON canónico de la entrada (claves ordenadas). Si coincide con el guardado, responde `UNCHANGED` y no toca nada. Si es distinto, responde `UPDATED`. Si el id no existía, responde `CREATED`. Así, cualquier cambio en lo reportado (un checkbox sin commitear, un cambio de rúbrica del generador) se aplica sin trucos de fechas.
@@ -193,6 +210,8 @@ Cada artefacto lleva `content` y `truncated`. **Límite: 200 KB por artefacto.**
 3. **Excepción, un cambio ilegible.** Un cambio que llega como `{name, error}` conserva su última versión válida (tareas y artefactos) y se marca con el error y su fecha.
 4. **Repo ilegible.** Una entrada `{error}` conserva el último estado del proyecto y guarda el error con su fecha.
 5. **Proyectos ausentes.** Un proyecto guardado que no aparece en un snapshot válido se marca con `missing_since`, y no se borra. Si vuelve a aparecer, la marca se limpia.
+6. **Tareas cerradas.** Antes de reemplazar un proyecto `UPDATED`, el backend compara sus tareas guardadas con las nuevas. Cada tarea que antes estaba abierta y ahora está `[x]` (no tachada) se registra en `task_closed`, con el `generated_at` del snapshot. La tarea se identifica por origen, etapa (`key` o título) o cambio, y número; sin número, por el texto. Una tarea que aparece ya marcada no cuenta, ni las de un proyecto `CREATED`. Es un historial: el sync nunca lo borra.
+7. **Commits.** Por cada proyecto de `activity.projects`, sus commits guardados se reemplazan por los recibidos. Un commit sin `sha`, `at` o `subject` se descarta con aviso en el sync run. `activity` no participa en el hash de ninguna entrada.
 
 ## Validación
 

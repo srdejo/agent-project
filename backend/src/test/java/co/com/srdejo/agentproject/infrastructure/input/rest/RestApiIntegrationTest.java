@@ -39,8 +39,14 @@ class RestApiIntegrationTest extends IntegrationTestSupport {
                       "artifacts": {"proposal": {"content": "<script>alert(1)</script>", "truncated": false}},
                       "tasks": [{"number": "1.1", "text": "Uno", "line": 3, "checked": true},
                                 {"number": "1.2", "text": "Dos", "line": 4, "checked": false}]}]}},
-                 "hotel": {"name": "Hotel", "repo": "hotel", "state": "ACTIVE", "priority_rank": 2}}""");
-        sync.applySnapshot(parser.parse(snapshot), Instant.now()).block();
+                 "hotel": {"name": "Hotel", "repo": "hotel", "state": "ACTIVE", "priority_rank": 2,
+                   "openspec": {"commands": ["apply"], "changes": [{"name": "importar", "tasks": [
+                     {"number": "1.3", "text": "Importar. Bloqueada: falta el Excel", "line": 5, "checked": false}]}]}}}""");
+        String recent = java.time.OffsetDateTime.now().minusHours(1).toString();
+        String withActivity = snapshot.replaceFirst("\\}$", """
+                , "activity": {"since": "%s", "projects": {"hotel": [{"sha": "abc1234", "at": "%s", "subject": "feat: reservas"}]}}}"""
+                .formatted(recent, recent));
+        sync.applySnapshot(parser.parse(withActivity), Instant.now()).block();
     }
 
     @Test
@@ -112,21 +118,39 @@ class RestApiIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void dailyFocusesOnTheObjectiveChangeAndCarriesTheFourSections() {
+    void dailyCarriesDoneFocusAndBlockers() {
         client.get().uri("/api/daily").exchange()
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.date").value(date -> org.assertj.core.api.Assertions.assertThat((String) date)
                         .matches("\\d{4}-\\d{2}-\\d{2}"))
+                .jsonPath("$.doneSince").exists()
+                .jsonPath("$.done[0].projectId").isEqualTo("hotel")
+                .jsonPath("$.done[0].commits[0].sha").isEqualTo("abc1234")
+                .jsonPath("$.done[0].moreCommits").isEqualTo(0)
                 .jsonPath("$.focus.projectId").isEqualTo("nolost")
                 .jsonPath("$.focus.changeName").isEqualTo("kids")
+                .jsonPath("$.focus.nextNumber").isEqualTo("1.2")
                 .jsonPath("$.alternatives.length()").isEqualTo(0)
-                .jsonPath("$.needs[0].description").isEqualTo("Umbral de días")
+                .jsonPath("$.needs").doesNotExist()
+                .jsonPath("$.blockers[0].kind").isEqualTo("EDITORIAL")
+                .jsonPath("$.blockers[0].description").isEqualTo("Umbral de días")
+                .jsonPath("$.blockers[1].kind").isEqualTo("TASK")
+                .jsonPath("$.blockers[1].scope").isEqualTo("importar")
+                .jsonPath("$.blockers[1].number").isEqualTo("1.3")
+                .jsonPath("$.blockers[1].description").isEqualTo("falta el Excel")
                 .jsonPath("$.commands[4]").isEqualTo("/opsx:apply kids")
                 .jsonPath("$.stale").isBoolean()
-                .jsonPath("$.text").value(text -> org.assertj.core.api.Assertions.assertThat((String) text)
-                        .contains("Para hoy trabajaré en:", "Para trabajar necesito:", "Ejecuta en consola",
-                                "Para continuar:"));
+                .jsonPath("$.text").value(text -> {
+                    String t = (String) text;
+                    org.assertj.core.api.Assertions.assertThat(t)
+                            .contains("Hecho (desde el", "abc1234 feat: reservas", "Para hoy trabajaré en:",
+                                    "Bloqueos:", "Ejecuta en consola", "Para continuar:");
+                    org.assertj.core.api.Assertions.assertThat(t.indexOf("Hecho"))
+                            .isLessThan(t.indexOf("Para hoy trabajaré en:"));
+                    org.assertj.core.api.Assertions.assertThat(t.indexOf("Para hoy trabajaré en:"))
+                            .isLessThan(t.indexOf("Bloqueos:"));
+                });
     }
 
     @Test

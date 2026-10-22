@@ -29,10 +29,11 @@ class ReadUseCasesTest {
 
     private final InMemoryPorts.Projects projects = new InMemoryPorts.Projects();
     private final InMemoryPorts.Runs runs = new InMemoryPorts.Runs();
+    private final InMemoryPorts.Activity activity = new InMemoryPorts.Activity();
     private final InMemoryPorts.Agent agent = new InMemoryPorts.Agent();
 
     private void seed(ProjectSnapshot... snapshots) {
-        SyncSnapshotUseCase sync = new SyncSnapshotUseCase(projects, runs, Clock.fixed(SYNCED, ZoneOffset.UTC));
+        SyncSnapshotUseCase sync = new SyncSnapshotUseCase(projects, runs, activity, Clock.fixed(SYNCED, ZoneOffset.UTC));
         sync.applySnapshot(Fixtures.batch(snapshots), SYNCED).block();
     }
 
@@ -253,6 +254,24 @@ class ReadUseCasesTest {
         }
 
         @Test
+        void declaredBlockedTasksAreNotWorkToDo() {
+            seed(project("d").objective("MVP", "openspec:mvp")
+                    .change(change("mvp", ct("4.8", "x", true), ct("4.9", "Verificar. Bloqueada: faltan asesores", false)))
+                    .change(change("otro", ct("1.1", "x", true), ct("1.2", "Bloqueada: falta el CSV", false),
+                            ct("1.3", "libre", false)))
+                    .stage(stage("Etapa 1", "in_progress", rt("(bloqueada: sin dominio) Publicar", false), rt("ok", false)))
+                    .build());
+
+            Work w = work();
+
+            assertThat(w.continueItems()).extracting(Work.ContinueItem::changeName).containsExactly("otro");
+            assertThat(w.continueItems().get(0).nextNumber()).isEqualTo("1.3");
+            assertThat(w.actionable()).flatExtracting(Work.ActionableGroup::items).extracting(Work.ActionableItem::text)
+                    .doesNotContain("Verificar. Bloqueada: faltan asesores", "Bloqueada: falta el CSV",
+                            "(bloqueada: sin dominio) Publicar");
+        }
+
+        @Test
         void decisionsAreOrderedByOpenTasksAffected() {
             seed(project("a").rank(1).stage(stage("Fase 1", "closed", rt("x", false))).decision("chica", "Fase 1").build(),
                     project("b").rank(2).stage(stage("Fase 3", "closed", rt("1", false), rt("2", false), rt("3", false)))
@@ -276,7 +295,7 @@ class ReadUseCasesTest {
         void activityShowsRunsAndObjectiveProgress() {
             seed(project("d").hash("h1").objective("MVP", "Etapa 1")
                     .stage(stage("Etapa 1", "in_progress", rt("x", true), rt("y", false))).build());
-            new SyncSnapshotUseCase(projects, runs, Clock.fixed(SYNCED.plusSeconds(60), ZoneOffset.UTC))
+            new SyncSnapshotUseCase(projects, runs, activity, Clock.fixed(SYNCED.plusSeconds(60), ZoneOffset.UTC))
                     .applySnapshot(Fixtures.batch(project("d").hash("h2").objective("MVP", "Etapa 1")
                             .stage(stage("Etapa 1", "in_progress", rt("x", true), rt("y", true))).build()),
                             SYNCED.plusSeconds(60))

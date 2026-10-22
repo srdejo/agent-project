@@ -34,7 +34,7 @@ class SnapshotParserTest {
     @Test
     void protocolDocumentExampleIsValid() throws IOException {
         String doc = Files.readString(Path.of("../docs/SYNC_PROTOCOL.md"));
-        Matcher m = Pattern.compile("## Esquema\\s+```json\\n(.*?)\\n```", Pattern.DOTALL).matcher(doc);
+        Matcher m = Pattern.compile("## Esquema\\s+```json\\r?\\n(.*?)\\r?\\n```", Pattern.DOTALL).matcher(doc);
         assertThat(m.find()).as("bloque JSON de la sección Esquema").isTrue();
 
         SnapshotBatch result = parser.parse(m.group(1));
@@ -142,5 +142,42 @@ class SnapshotParserTest {
                 .contentHash();
 
         assertThat(a).isEqualTo(b).isNotEqualTo(c);
+    }
+
+    @Test
+    void activityIsReadPerProjectAndDropsInvalidCommits() {
+        SnapshotBatch result = parser.parse(snapshot("{\"hotel\": " + MINIMAL + "}").replaceFirst("\\}$", """
+                , "activity": {"since": "2026-10-08T07:00:00-05:00", "projects": {
+                  "hotel": [{"sha": "abc1234", "at": "2026-10-14T18:30:00-05:00", "subject": "feat: reservas"},
+                            {"at": "2026-10-14T18:00:00-05:00", "subject": "sin sha"}],
+                  "nolost": []}}}"""));
+
+        assertThat(result.activity()).containsOnlyKeys("hotel", "nolost");
+        assertThat(result.activity().get("hotel")).singleElement().satisfies(c -> {
+            assertThat(c.sha()).isEqualTo("abc1234");
+            assertThat(c.committedAt()).isEqualTo(java.time.Instant.parse("2026-10-14T23:30:00Z"));
+            assertThat(c.subject()).isEqualTo("feat: reservas");
+        });
+        assertThat(result.activity().get("nolost")).isEmpty();
+        assertThat(result.warnings().get("hotel")).singleElement().asString().contains("commit descartado (sin sha)");
+        assertThat(result.valid()).hasSize(1);
+    }
+
+    @Test
+    void withoutActivityTheBlockIsNull() {
+        SnapshotBatch result = parser.parse(snapshot("{\"hotel\": " + MINIMAL + "}"));
+
+        assertThat(result.activity()).isNull();
+        assertThat(result.valid()).hasSize(1);
+    }
+
+    @Test
+    void activityDoesNotChangeTheEntryHash() {
+        String plain = only(parser.parse(snapshot("{\"hotel\": " + MINIMAL + "}")), "hotel").contentHash();
+        String withActivity = only(parser.parse(snapshot("{\"hotel\": " + MINIMAL + "}").replaceFirst("\\}$",
+                ", \"activity\": {\"projects\": {\"hotel\": [{\"sha\": \"a\", \"at\": \"2026-10-14T18:30:00-05:00\", "
+                        + "\"subject\": \"x\"}]}}}")), "hotel").contentHash();
+
+        assertThat(withActivity).isEqualTo(plain);
     }
 }

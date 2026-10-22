@@ -1,8 +1,9 @@
+import { DatePipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { catchError, map, of, startWith } from 'rxjs';
-import { Daily, DailyItem } from '../../core/models/daily';
+import { Daily, DailyBlocker, DailyItem } from '../../core/models/daily';
 import { PortfolioApiService } from '../../core/services/portfolio-api.service';
 import { BLOCKER_LABEL } from '../../shared/labels';
 
@@ -10,7 +11,7 @@ type Load = { state: 'loading' } | { state: 'error' } | { state: 'ready'; daily:
 
 @Component({
   selector: 'app-daily',
-  imports: [RouterLink],
+  imports: [RouterLink, DatePipe],
   templateUrl: './daily.html',
 })
 export class DailyBlock {
@@ -32,6 +33,12 @@ export class DailyBlock {
     return item.kind === 'CHANGE' && item.changeName
       ? ['/projects', item.projectId, 'changes', item.changeName]
       : ['/projects', item.projectId];
+  }
+
+  /** A blocked OpenSpec task opens its change; a ROADMAP task or an editorial blocker, the project. */
+  blockerLink(b: DailyBlocker): string[] {
+    const isChange = b.kind === 'TASK' && b.number !== null && b.scope !== null;
+    return isChange ? ['/projects', b.projectId, 'changes', b.scope!] : ['/projects', b.projectId];
   }
 
   async copy(text: string): Promise<void> {

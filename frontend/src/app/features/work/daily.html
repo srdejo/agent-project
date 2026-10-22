@@ -29,7 +29,35 @@
         <p class="font-mono text-[11px] text-status-warn px-4 pt-3">Datos obsoletos: el último sync correcto supera el umbral. Confirma en los repos antes de seguir.</p>
       }
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6 px-4 py-4">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-6 px-4 py-4">
+        <div class="min-w-0">
+          <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-2">
+            Hecho <span class="normal-case tracking-normal">· desde el {{ d.doneSince | date: 'yyyy-MM-dd' : '-0500' }}</span>
+          </h3>
+          @for (g of d.done; track g.projectId) {
+            <div class="border-l-2 border-status-ok pl-3 py-1 mb-3">
+              <a [routerLink]="['/projects', g.projectId]" class="text-[13px] font-semibold tracking-tight hover:text-accent transition-colors break-words">{{ g.projectName }}</a>
+              @for (t of g.tasks; track t.scope + (t.number ?? '') + t.text) {
+                <p class="text-[12px] text-ink mt-1 break-words line-clamp-2">
+                  <span class="font-mono text-status-ok">[x]</span>
+                  <span class="font-mono text-ink-muted"> {{ t.scope }}@if (t.number) { {{ ' ' + t.number }}}</span>
+                  {{ t.text }}
+                </p>
+              }
+              @for (c of g.commits; track c.sha) {
+                <p class="text-[12px] text-ink mt-0.5 break-words line-clamp-1">
+                  <span class="font-mono text-[11px] text-ink-muted">{{ c.sha }}</span> {{ c.subject }}
+                </p>
+              }
+              @if (g.moreCommits > 0) {
+                <p class="font-mono text-[11px] text-ink-muted mt-0.5">… y {{ g.moreCommits }} commits más</p>
+              }
+            </div>
+          } @empty {
+            <p class="text-[13px] text-ink-muted">Sin actividad registrada.</p>
+          }
+        </div>
+
         <div class="min-w-0">
           <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-2">Para hoy trabajaré en</h3>
           @if (d.focus; as f) {
@@ -62,34 +90,48 @@
           } @else {
             <p class="text-[13px] text-ink-muted">Nada accionable: todo está hecho, bloqueado o en proyectos pausados.</p>
           }
-
-          <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mt-6 mb-2">Para trabajar necesito</h3>
-          @for (n of d.needs; track n.projectId + n.description) {
-            <a [routerLink]="['/projects', n.projectId]" [queryParams]="{ tab: 'blockers' }"
-               class="block border-l-2 border-status-warn pl-3 py-1 mb-1.5 hover:bg-surface-divider/40 transition-colors">
-              <span class="font-mono text-[11px] text-ink-muted">{{ n.projectName }} · {{ blockerLabel[n.type] ?? n.type }}</span>
-              <p class="text-[12px] text-ink break-words">{{ n.description }}</p>
-              @if (n.owner) {
-                <p class="font-mono text-[10px] text-ink-muted">Responsable: {{ n.owner }}</p>
-              }
-            </a>
-          } @empty {
-            <p class="text-[13px] text-ink-muted">Nada pendiente de terceros.</p>
-          }
         </div>
 
         <div class="min-w-0">
-          @if (d.commands.length) {
-            <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-1">Ejecuta en consola</h3>
-            <p class="text-[11px] text-ink-muted mb-1.5">Desde la raíz del workspace.</p>
-            <pre class="font-mono text-[11px] leading-relaxed bg-surface-bg border border-surface-border p-3 overflow-x-auto">{{ d.commands.join('\n') }}</pre>
-          }
-          @if (d.continuation) {
-            <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mt-6 mb-2">Para continuar</h3>
-            <pre class="font-mono text-[11px] leading-relaxed bg-surface-bg border border-surface-border p-3 whitespace-pre-wrap break-words max-h-72 overflow-y-auto">{{ d.continuation }}</pre>
+          <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-2">Bloqueos</h3>
+          @for (b of d.blockers; track $index) {
+            <a [routerLink]="blockerLink(b)" [queryParams]="b.kind === 'EDITORIAL' ? { tab: 'blockers' } : null"
+               class="block border-l-2 border-status-warn pl-3 py-1 mb-1.5 hover:bg-surface-divider/40 transition-colors">
+              @if (b.kind === 'EDITORIAL') {
+                <span class="font-mono text-[11px] text-ink-muted">{{ b.projectName }} · {{ blockerLabel[b.type ?? ''] ?? b.type }}</span>
+                <p class="text-[12px] text-ink break-words">{{ b.description }}</p>
+                @if (b.owner) {
+                  <p class="font-mono text-[10px] text-ink-muted">Responsable: {{ b.owner }}</p>
+                }
+              } @else {
+                <span class="font-mono text-[11px] text-ink-muted">{{ b.projectName }} · {{ b.scope }}@if (b.number) { {{ ' ' + b.number }}} · tarea bloqueada</span>
+                <p class="text-[12px] text-ink break-words">{{ b.description }}</p>
+                <p class="text-[11px] text-ink-muted break-words line-clamp-1">{{ b.taskText }}</p>
+              }
+            </a>
+          } @empty {
+            <p class="text-[13px] text-ink-muted">Nada bloqueado.</p>
           }
         </div>
       </div>
+
+      @if (d.commands.length || d.continuation) {
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6 px-4 pb-4">
+          @if (d.commands.length) {
+            <div class="min-w-0">
+              <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-1">Ejecuta en consola</h3>
+              <p class="text-[11px] text-ink-muted mb-1.5">Desde la raíz del workspace.</p>
+              <pre class="font-mono text-[11px] leading-relaxed bg-surface-bg border border-surface-border p-3 overflow-x-auto">{{ d.commands.join('\n') }}</pre>
+            </div>
+          }
+          @if (d.continuation) {
+            <div class="min-w-0">
+              <h3 class="font-mono text-[11px] uppercase tracking-wider text-ink-muted mb-2">Para continuar</h3>
+              <pre class="font-mono text-[11px] leading-relaxed bg-surface-bg border border-surface-border p-3 whitespace-pre-wrap break-words max-h-72 overflow-y-auto">{{ d.continuation }}</pre>
+            </div>
+          }
+        </div>
+      }
     }
   }
 </section>

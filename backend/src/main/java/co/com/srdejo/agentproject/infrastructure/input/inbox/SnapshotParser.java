@@ -14,6 +14,7 @@ import co.com.srdejo.agentproject.domain.model.ProjectSnapshot.Roadmap;
 import co.com.srdejo.agentproject.domain.model.ProjectSnapshot.RoadmapTask;
 import co.com.srdejo.agentproject.domain.model.ProjectSnapshot.SpecArtifact;
 import co.com.srdejo.agentproject.domain.model.ProjectSnapshot.Stage;
+import co.com.srdejo.agentproject.domain.model.RepoCommit;
 import co.com.srdejo.agentproject.domain.model.SnapshotBatch;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -23,6 +24,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -109,7 +111,33 @@ public class SnapshotParser {
         }
 
         return new SnapshotBatch(version.asInt(), textOrNull(root, "generator_version"), generatedAt, valid, rejected,
-                readErrors, warnings);
+                readErrors, warnings, activity(root.get("activity"), warnings));
+    }
+
+    /** Optional block: {@code null} when absent or malformed, so a missing block never erases stored commits. */
+    private static Map<String, List<RepoCommit>> activity(JsonNode activity, Map<String, List<String>> warnings) {
+        if (activity == null || !activity.isObject() || !activity.path("projects").isObject()) {
+            return null;
+        }
+        JsonNode projects = activity.get("projects");
+        Map<String, List<RepoCommit>> result = new LinkedHashMap<>();
+        for (String id : projects.propertyNames()) {
+            List<RepoCommit> commits = new ArrayList<>();
+            JsonNode list = projects.get(id);
+            for (JsonNode c : list.isArray() ? list : List.<JsonNode>of()) {
+                String sha = textOrNull(c, "sha");
+                String subject = textOrNull(c, "subject");
+                Instant at = instantOrNull(c, "at");
+                if (sha == null || subject == null || at == null) {
+                    warnings.computeIfAbsent(id, k -> new ArrayList<>())
+                            .add("commit descartado (" + (sha == null ? "sin sha" : sha) + "): faltan sha, at o subject");
+                    continue;
+                }
+                commits.add(new RepoCommit(id, sha, at, subject));
+            }
+            result.put(id, commits);
+        }
+        return result;
     }
 
     private ProjectSnapshot parseEntry(String id, JsonNode node, List<String> warnings) {
@@ -179,6 +207,14 @@ public class SnapshotParser {
                     textOrNull(b, "owner"), created, textOrNull(b, "resolution")));
         }
         return result;
+    }
+
+    private static Instant instantOrNull(JsonNode node, String field) {
+        try {
+            return OffsetDateTime.parse(node.path(field).asString("")).toInstant();
+        } catch (DateTimeParseException e) {
+            return null;
+        }
     }
 
     private Roadmap roadmap(JsonNode node) {
