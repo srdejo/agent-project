@@ -34,4 +34,4 @@
 ## 6. Despliegue
 
 - [ ] 6.1 Commit del generador en el repo raíz y de agent-project. Desplegar agent-project (backend + frontend) con la confirmación de Daniel y correr `sync-portfolio.ps1`. Verificar por loopback en el VPS: `GET /api/daily` trae `done` con commits de los últimos días, `blockers` incluye el proveedor de pagos de subscription-hub, y el foco no es `distriapp` 4.9. Daniel lo ve en https://agent.srdejo.com.co/.
-- [ ] 6.2 `docs/PROGRESS.md` con el estado del cambio y la evidencia del despliegue. Verificar: describe el daily con sus tres secciones y la fecha de la verificación en producción.
+- [x] 6.2 `docs/PROGRESS.md` con el estado del cambio y la evidencia del despliegue. Verificar: describe el daily con sus tres secciones y la fecha de la verificación en producción.
