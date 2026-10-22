@@ -13,4 +13,4 @@
 ## 3. Docs y despliegue
 
 - [x] 3.1 `docs/PROGRESS.md` reescrito al estado actual (historial resumido) y `docs/ARCHITECTURE.md` con `/api/daily`. Verificar: `PROGRESS.md` no describe `progreso.json` ni `/api/projects` como vigentes.
-- [ ] 3.2 Desplegar (con la confirmación de Daniel) y verificar en producción `GET /api/daily` por loopback; Daniel lo ve en el navegador.
+- [x] 3.2 Desplegar (con la confirmación de Daniel) y verificar en producción `GET /api/daily` por loopback; Daniel lo ve en el navegador. Verificado 2026-10-22: `curl 127.0.0.1:8083/api/daily` en el VPS devuelve el daily completo, y Daniel lo abre en agent.srdejo.com.co.
